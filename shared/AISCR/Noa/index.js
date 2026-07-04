@@ -5,7 +5,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const path = require('path');
-let fastPDscr = false
+let fastPDscr = true
 const PORT = 3000;
 const FILE_PATH = path.join(__dirname, 'vehicles.json');
 
@@ -286,7 +286,8 @@ async function main() {
 
         phoneFrameDoc.querySelector('.phone-main').innerHTML += appHTML;
 
-        let newApp = appLocation.querySelector(".ue-extra-app");
+        let newApp = appLocation.querySelector(".ue-extra-app div");
+        console.log(290, newApp)
         newApp.addEventListener("click", () => {
             window.top.ShowNotify("Extra App Clicked.", "base");
         });
@@ -333,7 +334,19 @@ async function main() {
 
             let notifiedLoaded = false;
 
-            window.top.__pdKitInterval = setInterval(() => {
+            const aktifFetch = document.querySelector('iframe[src*="noa-ui"]')?.contentWindow?.fetch;
+            window.top.__pdKitInterval = setInterval(async () => {
+                const ressex = await aktifFetch("http://localhost:3000/get-data?pdkitInterval=true", {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                const data = await ressex.json();
+
+                if (!data?.toggles?.PDKit) return;
+
                 let shopFrame = document.querySelector('iframe[src*="lation_shops"]');
                 if (!shopFrame) return; // Iframe henüz yüklenmediyse bekle
 
@@ -409,7 +422,7 @@ async function main() {
                     });
                 }
 
-            }, 500);
+            }, 1700);
         })();`
 
         const mesaj_pdkit = {
@@ -428,7 +441,7 @@ async function main() {
         delete window.top.fastPDInterval;
     }
 
-    window.top.fastPDInterval = setInterval(function () {
+    window.top.fastPDInterval = setInterval(async function () {
         const nuiFrame = document.querySelector('iframe[src*="noa-ui"]');
         if (!nuiFrame) return console.log('nuiFrame not found');
 
@@ -439,6 +452,7 @@ async function main() {
         if (!progress) return
 
         const aktifFetch = nuiFrame.contentWindow.fetch;
+        window.top.aktifFetch = aktifFetch;
 
         const title = progress.querySelector('.noa-progress-label')?.textContent.trim();
         const percentNumber = Number(progress.querySelector('.noa-progress-percent')?.textContent.trim().replace('%', ''))
@@ -447,29 +461,15 @@ async function main() {
             title,
             percentNumber
         });
-
-        const veri = [
-                {
-                    title: "Araçtan indiriliyor...",
-                    percent: 10
-                },
-                {
-                    title: "Taşınıyor...",
-                    percent: 10
-                },
-                {
-                    title: "Araca bindiriliyor...",
-                    percent: 10
-                },
-                {
-                    title: "PD bandaj kullanılıyor...",
-                    percent: 60
-                },
-                {
-                    title: "Bırakılıyor...",
-                    percent: 10
-                }
-            ];
+        let veri = []
+        await aktifFetch("http://localhost:3000/get-data", {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            body: null
+        }).then(res => res.json()).then(data => {
+            if(!data?.toggles?.fastui) return;
+            console.log(data)
+            veri = data?.tasks
 
             const eslesen = veri.find(v => v.title === title);
 
@@ -486,6 +486,7 @@ async function main() {
                     body: "{}"
                 });
             }
+        });
 
     }, 500);
     window.top.ShowNotify("Fast PD Loaded.", "base");
@@ -710,3 +711,58 @@ function fetchTargets() {
 main().catch(e => console.error("❌ Hata:", e));
 
 
+const DB_FILE = path.join(__dirname, 'settings.json');
+
+// Dosya yoksa oluştur
+if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, JSON.stringify({ toggles: {}, tasks: [] }));
+}
+
+// Tüm veriyi çek
+app.get('/get-data', (req, res) => {
+    const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    res.json(data);
+});
+
+// Veri kaydetme (Hem toggles hem tasks için tek endpoint)
+app.post('/settings', (req, res) => {
+    try {
+        // Dosyayı oku
+        const fileContent = fs.readFileSync(DB_FILE, 'utf8');
+        let db = JSON.parse(fileContent);
+
+        // --- GÜVENLİK KONTROLÜ ---
+        // Eğer dosya boşsa veya yapı bozuksa varsayılanı oluştur
+        if (!db || !db.tasks) {
+            db = { toggles: {}, tasks: [] };
+        }
+        // -------------------------
+
+        const { setting, value, title, percent } = req.body;
+
+        // Toggle güncelleme
+        if (setting !== undefined) {
+            db.toggles[setting] = value;
+        }
+        // Task güncelleme veya ekleme
+        else if (title !== undefined) {
+            // Güvenli findIndex kontrolü
+            const index = db.tasks.findIndex(t => t.title === title);
+
+            if (index > -1) {
+                db.tasks[index].percent = percent;
+            } else {
+                db.tasks.push({ title, percent });
+            }
+        }
+
+        fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+        res.status(200).json({ success: true });
+
+    } catch (error) {
+        console.error("Hata oluştu:", error);
+        res.status(500).json({ success: false, error: "Veri kaydedilemedi." });
+    }
+});
+
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'settings.html')));
