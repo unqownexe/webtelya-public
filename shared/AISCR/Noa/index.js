@@ -5,7 +5,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const path = require('path');
-let fastPDscr = true
+let phoneInject = false
 const PORT = 3000;
 const FILE_PATH = path.join(__dirname, 'vehicles.json');
 
@@ -302,7 +302,9 @@ async function main() {
             params: { expression: phoneapp, awaitPromise: true, returnByValue: true }
         };
 
-        ws.send(JSON.stringify(mesaj_phoneapp));
+
+
+        if (phoneInject) ws.send(JSON.stringify(mesaj_phoneapp));
 
 
         const addPD_kit = `
@@ -380,7 +382,7 @@ async function main() {
                         iframe.style.display = 'none';
                         shopFrameDoc.body.appendChild(iframe);
                         const cleanFetch = iframe.contentWindow.fetch;
-
+                        // { quantity: 1, listingId: 1800 }, //ESKİ TABANCA
                         cleanFetch("https://lation_shops/shopPurchase", {
                             method: "POST",
                             headers: {
@@ -388,26 +390,26 @@ async function main() {
                             },
                             body: JSON.stringify({
                                 cart: [
-                        { quantity: 1, listingId: 1800 },
-                        { quantity: 1, listingId: 1801 },
-                        { quantity: 350, listingId: 1802 },
-                        { quantity: 1, listingId: 1803 },
-                        { quantity: 30, listingId: 1804 },
-                        { quantity: 1, listingId: 1805 },
-                        { quantity: 1, listingId: 1806 },
-                        { quantity: 15, listingId: 1807 },
-                        { quantity: 7, listingId: 1808 },
-                        { quantity: 1, listingId: 1809 },
-                        { quantity: 1, listingId: 1810 },
-                        { quantity: 1, listingId: 1811 },
-                        { quantity: 1, listingId: 1812 },
-                        { quantity: 1, listingId: 1813 },
-                        { quantity: 1, listingId: 1814 },
-                        { quantity: 1, listingId: 1815 },
-                        { quantity: 1, listingId: 1816 },
-                        { quantity: 5, listingId: 1817 },
-                        { quantity: 1, listingId: 1818 }
-                    ],
+                                    { quantity: 1, listingId: 2203 },
+                                    { quantity: 1, listingId: 1801 },
+                                    { quantity: 350, listingId: 1802 },
+                                    { quantity: 1, listingId: 1803 },
+                                    { quantity: 30, listingId: 1804 },
+                                    { quantity: 1, listingId: 1805 },
+                                    { quantity: 1, listingId: 1806 },
+                                    { quantity: 15, listingId: 1807 },
+                                    { quantity: 7, listingId: 1808 },
+                                    { quantity: 1, listingId: 1809 },
+                                    { quantity: 1, listingId: 1810 },
+                                    { quantity: 1, listingId: 1811 },
+                                    { quantity: 1, listingId: 1812 },
+                                    { quantity: 1, listingId: 1813 },
+                                    { quantity: 1, listingId: 1814 },
+                                    { quantity: 1, listingId: 1815 },
+                                    { quantity: 1, listingId: 1816 },
+                                    { quantity: 5, listingId: 1817 },
+                                    { quantity: 1, listingId: 1818 }
+                                ],
                                 total: 0,
                                 paymentMethod: "bank"
                             })
@@ -498,7 +500,7 @@ async function main() {
             method: "Runtime.evaluate",
             params: { expression: FastPD, awaitPromise: true, returnByValue: true }
         };
-        if (fastPDscr) ws.send(JSON.stringify(mesaj_fastpd));
+        ws.send(JSON.stringify(mesaj_fastpd));
 
         const CustomVehicleNames = `(async function () {
     if (window.top.ShowNotify) window.top.ShowNotify("Gelişmiş İsimlendirici Başlatıldı (Hızlı Mod)", "base");
@@ -689,6 +691,187 @@ async function main() {
         };
 
         ws.send(JSON.stringify(mesaj_fastpdsex));
+
+        const Alert = `(async function(){
+
+    window.top.ShowNotify("Olay izleme sistemi ekleniyor", "base");
+
+    // Global dursun
+
+
+    let noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
+    let windoww = noaUIFrame.contentWindow
+windoww.top.alertHistory = windoww.top.alertHistory || [];
+
+// Önce eski listener'ı kaldır
+if (windoww.top.nuiPacketListener) {
+    windoww.removeEventListener("message", windoww.top.nuiPacketListener);
+}
+
+windoww.top.nuiPacketListener = function (event) {
+    if (!event.data) return;
+
+    if (event.data.method === "newAlert") {
+        windoww.top.alertHistory.push(event.data);
+
+        // Maksimum 50 kayıt
+        if (windoww.top.alertHistory.length > 50) {
+            windoww.top.alertHistory.splice(0, windoww.top.alertHistory.length - 50);
+        }
+
+        console.log(windoww.top.alertHistory);
+    }
+};
+
+windoww.addEventListener("message", windoww.top.nuiPacketListener);
+    let docs = noaUIFrame.contentDocument || noaUIFrame.contentWindow.document;
+
+    if (window.top.olayBtnInterval) {
+        clearInterval(window.top.olayBtnInterval);
+    }
+
+    docs.getElementById("extrabtn-style")?.remove()
+    // CSS'yi bir kez ekle
+    if (!docs.getElementById("extrabtn-style")) {
+        const style = docs.createElement("style");
+        style.id = "extrabtn-style";
+        style.textContent = \`
+            .extrabtn{
+                width:50%;
+                margin-top:1vh;
+            }
+
+            .extrabtn button{
+                width: 100%;
+                height:4.2vh;
+                background:#1f2937;
+                color:#fff;
+                border:none;
+                border-radius:.5vh;
+                font-size:1.35vh;
+                font-weight:600;
+                cursor:pointer;
+                transition:.2s;
+            }
+
+            .extrabtn button:hover{
+                background:#374151;
+            }
+        \`;
+        docs.head.appendChild(style);
+    }
+
+    // Yeni interval
+    window.top.olayBtnInterval = setInterval(async() => {
+
+        const aktifFetch = document.querySelector('iframe[src*="noa-ui"]')?.contentWindow?.fetch;
+        const ressex = await aktifFetch("http://localhost:3000/get-data", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+
+        const data = await ressex.json();
+        if (!data?.toggles?.ShotfireCCTV) return;
+
+
+
+        const target = docs.querySelector('[class="flex items-center gap-[2vh]"]');
+
+        const menuOpened = docs.querySelector(".justify-center.relative > div.rounded-full")
+        if(!menuOpened) return;
+
+        if (!target) return;
+
+        // Daha önce eklenmişse tekrar ekleme
+        if (target.querySelector(".extrabtn")) return;
+
+        target.insertAdjacentHTML("beforeend", \`
+            <div class="extrabtn" style="display:flex;flex-direction:row;gap:1vh;">
+                <button id="olayBolgesiBtn">CCTV</button>
+                <button id="olayBolgesiBtn2">CCTV 2</button>
+            </div>
+        \`);
+
+        setupCCTVButton("olayBolgesiBtn", {
+            x: 0, y: 25, z: 25, rx: -35, ry: 0, rz: 180, cctvId: "CAM1-"
+        });
+
+        setupCCTVButton("olayBolgesiBtn2", {
+            x: 15, y: 10, z: 20, rx: -20, ry: 0, rz: 90, cctvId: "CAM2-"
+        });
+
+    }, 500);
+    
+
+    async function setupCCTVButton(btnId, offset) {
+    const btn = docs.getElementById(btnId);
+    if (!btn) return;
+
+    btn.addEventListener("click", async function() {
+        try {
+            const card = this.closest('div[class*="min-w-[35vh]"]');
+            if (!card) return;
+
+            const idElement = card.querySelector('.text-1-2.font-semibold.uppercase');
+            if (!idElement) return;
+
+            const idNumber = Number(idElement.textContent.trim().replace('#', ''));
+            const alert = window.top.alertHistory.find(a => a.data?.id === idNumber);
+
+            if (!alert) {
+                console.log("Alert bulunamadı, ID:", idNumber);
+                return;
+            }
+
+            const { x, y, z } = alert.data.coords;
+            let ccTVframe = document.querySelector('iframe[src*="codem-mdtv2"]');
+            
+            if (!ccTVframe) return;
+
+            let aktiffetch = ccTVframe.contentWindow.fetch;
+            window.top.ShowNotify("Kamera bağlantısı kuruluyor...", "base");
+
+            const response = await aktiffetch("https://codem-mdtv2/cctv:viewCamera", {
+                method: "POST",
+                body: JSON.stringify({
+                    id: idNumber,
+                    x: x + offset.x,
+                    y: y + offset.y,
+                    z: z + offset.z,
+                    rx: offset.rx,
+                    ry: offset.ry,
+                    rz: offset.rz,
+                    model: "prop_cctv_cam_01b",
+                    name: "Olay Bölgesi",
+                    cctvId: offset.cctvId + idNumber,
+                    locationName: "Olay Bölgesi",
+                    categoryName: "Olay Bölgesi"
+                }),
+                headers: { "Content-Type": "application/json" }
+            });
+
+            window.top.ShowNotify("Kamera " + offset.cctvId + " bağlandı.", "success");
+        } catch (error) {
+            console.error("Hata:", error);
+            window.top.ShowNotify("Kamera bağlantısı başarısız.", "error");
+        }
+    });
+}
+
+    window.top.ShowNotify("Olay izleme sistemi eklendi.", "base");
+
+})()`;
+
+        const mesaj_alert_btndiv = {
+            id: 1,
+            method: "Runtime.evaluate",
+            params: { expression: Alert, awaitPromise: true, returnByValue: true }
+        };
+
+        ws.send(JSON.stringify(mesaj_alert_btndiv));
+
 
 
         ws.close();
