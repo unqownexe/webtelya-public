@@ -9,6 +9,9 @@ let fastPDscr = false
 const PORT = 3000;
 const FILE_PATH = path.join(__dirname, 'vehicles.json');
 
+if (!fs.existsSync(FILE_PATH)) {
+    fs.writeFileSync(FILE_PATH, JSON.stringify({}));
+}
 app.use(cors());
 app.use(express.json());
 
