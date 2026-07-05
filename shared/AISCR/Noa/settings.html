@@ -230,10 +230,47 @@
         <button onclick="document.getElementById('${MODAL_ID}').remove()"
             style="margin-top: 20px; padding: 10px 30px; background: transparent; border: 1px solid #ff4444; color: #ff4444; border-radius: 8px; cursor: pointer; width: 100%;">Kapat</button>
     </div>
+    
+    <div id="restart-notify" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #ff4444; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; z-index: 10000; box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4); font-weight: bold; transition: all 0.3s;" onclick="restartScripts()">
+        Değişiklikleri Uygula (Yeniden Çalıştır)
+    </div>
 </div>
 
 <script>
     let tasks = [];
+    
+    function showRestartNotify() {
+        document.getElementById('restart-notify').style.display = 'block';
+    }
+
+    async function restartScripts() {
+        const notify = document.getElementById('restart-notify');
+        notify.innerText = "Yeniden Başlatılıyor...";
+        notify.style.background = "#ff9900";
+        
+        try {
+            const response = await fetch('/restart-scripts', { method: 'POST' });
+            if (response.ok) {
+                notify.innerText = "Başarıyla Yeniden Başlatıldı!";
+                notify.style.background = "#36ff9f";
+                notify.style.color = "#000";
+                setTimeout(() => {
+                    notify.style.display = 'none';
+                    notify.innerText = "Değişiklikleri Uygula (Yeniden Çalıştır)";
+                    notify.style.background = "#ff4444";
+                    notify.style.color = "white";
+                }, 2000);
+            } else {
+                throw new Error();
+            }
+        } catch (e) {
+            notify.innerText = "Hata! Oyun Açık mı?";
+            setTimeout(() => {
+                notify.innerText = "Değişiklikleri Uygula (Yeniden Çalıştır)";
+                notify.style.background = "#ff4444";
+            }, 2000);
+        }
+    }
 
     // 1. Sayfa yüklendiğinde JSON verilerini çek
     async function initData() {
@@ -289,6 +326,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newTask)
         });
+        
+        showRestartNotify();
 
         titleInput.value = '';
     }
@@ -368,6 +407,8 @@
                 value: el.classList.contains('on')
             })
         });
+        
+        showRestartNotify();
     }
 
     // GPS Renk Seçimi
@@ -393,6 +434,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ gpsConfig: { name, color } })
         });
+        
+        showRestartNotify();
 
         const btn = document.getElementById('gps-save-btn');
         btn.innerText = "Kaydedildi!";
