@@ -119,6 +119,95 @@ async function main() {
     
     let noaUIFrameDoc = noaUIFrame.contentDocument || noaUIFrame.contentWindow.document;
 
+window.top.sendNoaChat = function (type, message) {
+    console.log("[NOA CHAT] Fonksiyon çağrıldı.", { type, message });
+
+    const noaChatUI = document.querySelector('iframe[src*="tgiann-chat"]');
+    console.log("[NOA CHAT] iframe:", noaChatUI);
+
+    if (!noaChatUI) {
+        console.error("[NOA CHAT] iframe bulunamadı.");
+        return false;
+    }
+
+    const doc = noaChatUI.contentDocument || noaChatUI.contentWindow?.document;
+    console.log("[NOA CHAT] document:", doc);
+
+    if (!doc) {
+        console.error("[NOA CHAT] iframe document alınamadı.");
+        return false;
+    }
+
+    const chatArea = doc.querySelector(
+        "#root > div > div.relative.z-2.w-fit > div > div.w-full > div > div > div > div"
+    );
+
+    console.log("[NOA CHAT] chatArea:", chatArea);
+
+    if (!chatArea) {
+        console.error("[NOA CHAT] chatArea bulunamadı.");
+        return false;
+    }
+
+    console.log("[NOA CHAT] chatArea child sayısı:", chatArea.children.length);
+
+    const lastMessage = doc.querySelector(".max-w-full.overflow-hidden:last-child");
+    console.log("[NOA CHAT] son mesaj:", lastMessage);
+
+    console.log("[NOA CHAT] son mesaj parent:", lastMessage?.parentElement);
+
+    const colors = {
+        success: {
+            bg: "rgb(40, 167, 69)",
+            text: "Başarılı"
+        },
+        failed: {
+            bg: "rgb(255, 105, 97)",
+            text: "Hata"
+        },
+        warning: {
+            bg: "rgb(255, 193, 7)",
+            text: "Uyarı"
+        },
+        info: {
+            bg: "rgb(23, 162, 184)",
+            text: "Bilgi"
+        }
+    };
+
+    const c = colors[type] || colors.info;
+
+    const div = doc.createElement("div");
+    div.className = "max-w-full overflow-hidden";
+    div.style.opacity = "1";
+    div.style.transform = "none";
+
+    div.innerHTML = \`
+        <p class="text-[1.5vh] leading-[120%] max-w-full wrap-break-word">
+            <span class="tag mr-[0.5vh]"
+                style="background:\${c.bg};color:rgb(51,51,51);">
+                \${c.text}
+            </span>
+            <span class="text-shadow-[0_1px_0_rgb(0,0,0)]"
+                style="color:rgb(255,255,255);">
+                \${message}
+            </span>
+        </p>
+    \`;
+
+
+        chatArea.appendChild(div);
+
+        const children = chatArea.children;
+
+        if (children.length > 10) {
+            children[children.length - 11].remove();
+        }
+        chatArea.scrollTop = chatArea.scrollHeight;
+
+        return true;
+    };
+
     window.top.ShowNotify = function (text, type = "error", duration = 5000) {
         const container = noaUIFrameDoc.querySelector(".noa-notify-container");
         if (!container) return;
@@ -156,7 +245,7 @@ async function main() {
             notify.remove();
         }, duration);
     };
-
+    window.top.sendNoaChat("info", "Chat Notify loaded.");
     window.top.ShowNotify("Notify Loaded.", "base");
 })()`;
 
@@ -692,46 +781,286 @@ async function main() {
 
         ws.send(JSON.stringify(mesaj_fastpdsex));
 
-        const Alert = `(async function(){
+        let CCTVClean = `
+        if (window.top.cctvClean) clearInterval(window.top.cctvClean);
 
-    window.top.ShowNotify("Olay izleme sistemi ekleniyor", "base");
+    window.top.cctvClean = setInterval(() => {
+    const ccTVframe = document.querySelector('iframe[src*="codem-mdtv2"]');
+    if (!ccTVframe) {
+        console.log("iframe yok");
+        return;
+    }
 
-    // Global dursun
+    const ccTVDoc = ccTVframe.contentDocument || ccTVframe.contentWindow?.document;
+    if (!ccTVDoc) {
+        console.log("doc yok");
+        return;
+    }
 
+    const ccTVFrameMainScreen = ccTVDoc.querySelector('#main-screen > div > div > div[class*="top-1/2"]')
 
-    let noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
-    let windoww = noaUIFrame.contentWindow
-windoww.top.alertHistory = windoww.top.alertHistory || [];
+   if (ccTVFrameMainScreen) {
+    [...ccTVFrameMainScreen.children]
+        .slice(0, -1)
+        .forEach(el => el.remove());
 
-// Önce eski listener'ı kaldır
-if (windoww.top.nuiPacketListener) {
-    windoww.removeEventListener("message", windoww.top.nuiPacketListener);
+    const bgWhite = ccTVFrameMainScreen.lastElementChild?.querySelector(".bg-white");
+
+    if (bgWhite) {
+        bgWhite.style.setProperty("--tw-bg-opacity", "0.2");
+        bgWhite.style.scale = "0.5";
+    }
 }
+}, 500);
+        `
+        const mesaj_cctv_clean = {
+            id: 1,
+            method: "Runtime.evaluate",
+            params: { expression: CCTVClean, awaitPromise: true, returnByValue: true }
+        };
 
-windoww.top.nuiPacketListener = function (event) {
-    if (!event.data) return;
+        ws.send(JSON.stringify(mesaj_cctv_clean));
 
-    if (event.data.method === "newAlert") {
-        windoww.top.alertHistory.push(event.data);
-
-        // Maksimum 50 kayıt
-        if (windoww.top.alertHistory.length > 50) {
-            windoww.top.alertHistory.splice(0, windoww.top.alertHistory.length - 50);
+        const Alert = `(async function(){
+    // Temizlik fonksiyonu - alertHistory KORUNUR
+    function cleanup() {
+        // NUI listener'ları temizle
+        if (window.top.nuiPacketListener) {
+            const noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
+            if (noaUIFrame) {
+                const windoww = noaUIFrame.contentWindow;
+                windoww.removeEventListener("message", window.top.nuiPacketListener);
+            }
+            delete window.top.nuiPacketListener;
         }
 
-        console.log(windoww.top.alertHistory);
-    }
-};
+        // Message listener'ı temizle
+        if (window.top.__MSGnuiMessageListener) {
+            const targetWindow = document.querySelector('iframe[src*="tgiann-chat"]') || document.querySelector('iframe[name*="tgiann-chat"]');
+            if (targetWindow) {
+                const tw = targetWindow.contentWindow || targetWindow.contentDocument;
+                tw.removeEventListener("message", window.top.__MSGnuiMessageListener);
+            }
+            delete window.top.__MSGnuiMessageListener;
+        }
 
-windoww.addEventListener("message", windoww.top.nuiPacketListener);
+        // Interval'ı temizle
+        if (window.top.olayBtnInterval) {
+            clearInterval(window.top.olayBtnInterval);
+            delete window.top.olayBtnInterval;
+        }
+
+        // Buton click listener'larını temizle
+        if (window.top.cctvButtonListeners) {
+            window.top.cctvButtonListeners.forEach(({ element, listener }) => {
+                element.removeEventListener("click", listener);
+            });
+            delete window.top.cctvButtonListeners;
+        }
+
+        // CSS ve butonları DOM'dan temizle
+        const noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
+        if (noaUIFrame) {
+            const docs = noaUIFrame.contentDocument || noaUIFrame.contentWindow.document;
+            const style = docs.getElementById("extrabtn-style");
+            if (style) style.remove();
+
+            const extraBtn = docs.querySelector(".extrabtn");
+            if (extraBtn) extraBtn.remove();
+        }
+
+        // Bildirim zamanlayıcılarını temizle
+        if (window.top.notifyTimeouts) {
+            window.top.notifyTimeouts.forEach(timeout => clearTimeout(timeout));
+            delete window.top.notifyTimeouts;
+        }
+    }
+
+    // ShowNotify wrapper - aynı bildirimin tekrarını engelle
+    function showNotifyOnce(message, type, key) {
+        if (!window.top.notifyCache) {
+            window.top.notifyCache = {};
+        }
+
+        const cacheKey = key || message;
+        
+        // Eğer aynı mesaj son 2 saniye içinde gösterildiyse tekrar gösterme
+        if (window.top.notifyCache[cacheKey] && Date.now() - window.top.notifyCache[cacheKey] < 2000) {
+            return;
+        }
+
+        window.top.notifyCache[cacheKey] = Date.now();
+        window.top.ShowNotify(message, type);
+
+        // 3 saniye sonra cache'i temizle
+        if (!window.top.notifyTimeouts) {
+            window.top.notifyTimeouts = [];
+        }
+        
+        const timeout = setTimeout(() => {
+            delete window.top.notifyCache[cacheKey];
+        }, 3000);
+        
+        window.top.notifyTimeouts.push(timeout);
+    }
+
+    window.top.ShowNotify("Olay izleme sistemi temizleniyor...", "base");
+
+    // Temizlik yap (alertHistory KORUNUR)
+    const savedAlertHistory = window.top.alertHistory; // alertHistory'i koru
+    cleanup();
+    
+    // Eğer alertHistory varsa geri yükle, yoksa yeni oluştur
+    window.top.alertHistory = savedAlertHistory || [];
+    
+    // notifyCache'i temizle
+    if (window.top.notifyCache) {
+        delete window.top.notifyCache;
+    }
+
+    window.top.ShowNotify("Olay izleme sistemi ekleniyor...", "base");
+
+    // Ana hedef window'u bul
+    let TargetWindow = document.querySelector('iframe[src*="tgiann-chat"]') || document.querySelector('iframe[name*="tgiann-chat"]');
+    TargetWindow = TargetWindow.contentWindow || TargetWindow.contentDocument;
+
+    // PoliceAlert iframe'ini bul
+    let noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
+    let windoww = noaUIFrame.contentWindow;
+
+    // Yeni message listener oluştur
+    TargetWindow.__MSGnuiMessageListener = async function (event) {
+        if (!event.data) return;
+
+        if (event.data.action === "addMessage") {
+            const text = event.data.data.args?.[0];
+            if (!text) return;
+
+            let args = text.split(" ");
+            const command = args.shift();
+
+            if (command.toLowerCase() === "cctv") {
+                const id = Number(args[0]);
+                
+                // DÜZELTME: ID'ye göre alert bul
+                let olay;
+                if (id === 0) {
+                    olay = window.top.alertHistory[window.top.alertHistory.length - 1];
+                } else {
+                    olay = window.top.alertHistory.find(a => a.data?.id === id);
+                }
+                
+                console.log("Aranan ID:", id, "Bulunan olay:", olay);
+                
+                if (!olay) {
+                    window.top.sendNoaChat("failed", "Olay bulunamadı.");
+                    return;
+                }
+
+                const { x, y, z } = olay.data.coords;
+                console.log("Koordinatlar:", x, y, z);
+                window.top.sendNoaChat("success", \`Olay bulundu. ID: \${olay.data.id}\`);
+
+                // Kamera offset'leri
+                const cameraOffsets = [
+    // İlk 20 (mevcut)
+    { x: 0,   y: 25,  z: 25, rx: -35, ry: 0, rz: 180, cctvId: "CAM1-"  },
+    { x: 15,  y: 10,  z: 20, rx: -20, ry: 0, rz: 90,  cctvId: "CAM2-"  },
+    { x: 0,   y: 0,   z: 30, rx: -90, ry: 0, rz: 0,   cctvId: "CAM3-"  },
+    { x: 0,   y: 0,   z: 15, rx: -90, ry: 0, rz: 0,   cctvId: "CAM4-"  },
+    { x: -20, y: 0,   z: 18, rx: -20, ry: 0, rz: 270, cctvId: "CAM5-"  },
+    { x: 20,  y: 0,   z: 18, rx: -20, ry: 0, rz: 90,  cctvId: "CAM6-"  },
+    { x: 0,   y: -20, z: 18, rx: -20, ry: 0, rz: 0,   cctvId: "CAM7-"  },
+    { x: 0,   y: 20,  z: 18, rx: -20, ry: 0, rz: 180, cctvId: "CAM8-"  },
+    { x: 15,  y: 15,  z: 20, rx: -25, ry: 0, rz: 135, cctvId: "CAM9-"  },
+    { x: -15, y: 15,  z: 20, rx: -25, ry: 0, rz: 225, cctvId: "CAM10-" },
+    { x: 15,  y: -15, z: 20, rx: -25, ry: 0, rz: 45,  cctvId: "CAM11-" },
+    { x: -15, y: -15, z: 20, rx: -25, ry: 0, rz: 315, cctvId: "CAM12-" },
+    { x: 35,  y: 0,   z: 30, rx: -35, ry: 0, rz: 90,  cctvId: "CAM13-" },
+    { x: -35, y: 0,   z: 30, rx: -35, ry: 0, rz: 270, cctvId: "CAM14-" },
+    { x: 0,   y: 35,  z: 30, rx: -35, ry: 0, rz: 180, cctvId: "CAM15-" },
+    { x: 0,   y: -35, z: 30, rx: -35, ry: 0, rz: 0,   cctvId: "CAM16-" },
+    { x: 8,   y: 8,   z: 45, rx: -75, ry: 0, rz: 135, cctvId: "CAM17-" },
+    { x: -8,  y: 8,   z: 45, rx: -75, ry: 0, rz: 225, cctvId: "CAM18-" },
+    { x: 8,   y: -8,  z: 45, rx: -75, ry: 0, rz: 45,  cctvId: "CAM19-" },
+    { x: -8,  y: -8,  z: 45, rx: -75, ry: 0, rz: 315, cctvId: "CAM20-" },
+];
+
+                const offsetIndex = Number(args[1]) || 0;
+                const offsetSet = cameraOffsets[offsetIndex] || cameraOffsets[0];
+                
+                let ccTVframe = document.querySelector('iframe[src*="codem-mdtv2"]');
+                if (!ccTVframe) {
+                    window.top.sendNoaChat("failed", "MDTV sistemi bulunamadı.");
+                    return;
+                }
+                
+                let aktiffetch = ccTVframe.contentWindow.fetch;
+
+                showNotifyOnce("Kamera bağlantısı kuruluyor...", "base", "cctv_connecting_" + id);
+
+                try {
+                    const response = await aktiffetch("https://codem-mdtv2/cctv:viewCamera", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            id: olay.data.id,
+                            x: x + offsetSet.x,
+                            y: y + offsetSet.y,
+                            z: z + offsetSet.z,
+                            rx: offsetSet.rx,
+                            ry: offsetSet.ry,
+                            rz: offsetSet.rz,
+                            model: "prop_cctv_cam_01b",
+                            name: "Olay Bölgesi " + offsetSet.cctvId + olay.data.id,
+                            cctvId: offsetSet.cctvId + olay.data.id,
+                            locationName: "Olay Bölgesi " + offsetSet.cctvId,
+                            categoryName: "Olay Bölgesi " + offsetSet.cctvId
+                        }),
+                        headers: { "Content-Type": "application/json" }
+                    });
+
+                    const result = await response.json();
+                    console.log("Kamera cevabı:", result);
+
+                    showNotifyOnce("Kamera " + offsetSet.cctvId + " bağlandı.", "success", "cctv_connected_" + id + "_" + offsetSet.cctvId);
+                    window.top.sendNoaChat("success", \`Kamera \${offsetSet.cctvId} bağlandı.\`);
+                } catch (error) {
+                    console.error("Kamera hatası:", error);
+                    showNotifyOnce("Kamera bağlantısı başarısız.", "error", "cctv_error_" + id);
+                    window.top.sendNoaChat("failed", "Kamera bağlantısı başarısız.");
+                }
+            }
+        }
+    };
+
+    TargetWindow.addEventListener("message", TargetWindow.__MSGnuiMessageListener);
+
+    // NUI packet listener - alertHistory'e ekle
+    window.top.nuiPacketListener = function (event) {
+        if (!event.data) return;
+
+        if (event.data.method === "newAlert") {
+            // Aynı alert'in tekrar eklenmesini engelle
+            const exists = window.top.alertHistory.some(a => a.data?.id === event.data.data?.id);
+            if (!exists) {
+                window.top.alertHistory.push(event.data);
+
+                if (window.top.alertHistory.length > 50) {
+                    window.top.alertHistory.splice(0, window.top.alertHistory.length - 50);
+                }
+            }
+
+            console.log("AlertHistory güncellendi:", window.top.alertHistory.length);
+            console.log("Son alert:", window.top.alertHistory[window.top.alertHistory.length - 1]);
+        }
+    };
+
+    windoww.addEventListener("message", window.top.nuiPacketListener);
+
+    // Dokümanı al
     let docs = noaUIFrame.contentDocument || noaUIFrame.contentWindow.document;
 
-    if (window.top.olayBtnInterval) {
-        clearInterval(window.top.olayBtnInterval);
-    }
-
-    docs.getElementById("extrabtn-style")?.remove()
-    // CSS'yi bir kez ekle
+    // CSS'yi ekle
     if (!docs.getElementById("extrabtn-style")) {
         const style = docs.createElement("style");
         style.id = "extrabtn-style";
@@ -739,10 +1068,13 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
             .extrabtn{
                 width:100%;
                 margin-top:1vh;
+                display:flex;
+                flex-direction:row;
+                gap:1vh;
             }
 
             .extrabtn button{
-                width: 100%;
+                flex:1;
                 height:4.2vh;
                 background:#1f2937;
                 color:#fff;
@@ -761,106 +1093,136 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
         docs.head.appendChild(style);
     }
 
-    // Yeni interval
-    window.top.olayBtnInterval = setInterval(async() => {
+    // Buton listener'larını tutmak için
+    window.top.cctvButtonListeners = [];
 
+    // Butonları ekleme interval'i
+    window.top.olayBtnInterval = setInterval(async () => {
         const aktifFetch = document.querySelector('iframe[src*="noa-ui"]')?.contentWindow?.fetch;
-        const ressex = await aktifFetch("http://localhost:3000/get-data", {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json"
-            }
-        });
+        if (!aktifFetch) return;
 
-        const data = await ressex.json();
-        if (!data?.toggles?.ShotfireCCTV) return;
-
-
-
-        const target = docs.querySelector('[class="flex items-center gap-[2vh]"]');
-
-        const menuOpened = docs.querySelector(".justify-center.relative > div.rounded-full")
-        if(!menuOpened) return;
-        if (!target) return;
-        const parent = target?.parentElement;
-        if(!parent) return;
-
-        // Daha önce eklenmişse tekrar ekleme
-        if (parent.querySelector(".extrabtn")) return;
-
-        parent.insertAdjacentHTML("beforeend", \`
-            <div class="extrabtn" style="display:flex;flex-direction:row;gap:1vh;">
-                <button id="olayBolgesiBtn">CCTV</button>
-                <button id="olayBolgesiBtn2">CCTV 2</button>
-                <button id="olayBolgesiBtn3">CCTV 3</button>
-                <button id="olayBolgesiBtn4">CCTV 4</button>
-            </div>
-        \`);
-
-        setupCCTVButton("olayBolgesiBtn", {x: 0,y: 25,z: 25,rx: -35,ry: 0,rz: 180,cctvId: "CAM1-"});
-        setupCCTVButton("olayBolgesiBtn2", {x: 15,y: 10,z: 20,rx: -20,ry: 0,rz: 90,cctvId: "CAM2-"});
-        setupCCTVButton("olayBolgesiBtn3", {x: 0,y: 0,z: 30,rx: -90,ry: 0,rz: 0,cctvId: "CAM3-"});
-        setupCCTVButton("olayBolgesiBtn4", {x: 0,y: 0,z: 15,rx: -90,ry: 0,rz: 0,cctvId: "CAM4-"});
-
-    }, 1500);
-    
-
-    async function setupCCTVButton(btnId, offset) {
-    const btn = docs.getElementById(btnId);
-    if (!btn) return;
-
-    btn.addEventListener("click", async function() {
         try {
-            const card = this.closest('div[class*="min-w-[35vh]"]');
-            if (!card) return;
-
-            const idElement = card.querySelector('.text-1-2.font-semibold.uppercase');
-            if (!idElement) return;
-
-            const idNumber = Number(idElement.textContent.trim().replace('#', ''));
-            const alert = window.top.alertHistory.find(a => a.data?.id === idNumber);
-
-            if (!alert) {
-                console.log("Alert bulunamadı, ID:", idNumber);
-                return;
-            }
-
-            const { x, y, z } = alert.data.coords;
-            let ccTVframe = document.querySelector('iframe[src*="codem-mdtv2"]');
-            
-            if (!ccTVframe) return;
-
-            let aktiffetch = ccTVframe.contentWindow.fetch;
-            window.top.ShowNotify("Kamera bağlantısı kuruluyor...", "base");
-
-            const response = await aktiffetch("https://codem-mdtv2/cctv:viewCamera", {
-                method: "POST",
-                body: JSON.stringify({
-                    id: idNumber,
-                    x: x + offset.x,
-                    y: y + offset.y,
-                    z: z + offset.z,
-                    rx: offset.rx,
-                    ry: offset.ry,
-                    rz: offset.rz,
-                    model: "prop_cctv_cam_01b",
-                    name: "Olay Bölgesi",
-                    cctvId: offset.cctvId + idNumber,
-                    locationName: "Olay Bölgesi",
-                    categoryName: "Olay Bölgesi"
-                }),
-                headers: { "Content-Type": "application/json" }
+            const ressex = await aktifFetch("http://localhost:3000/get-data", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                }
             });
 
-            window.top.ShowNotify("Kamera " + offset.cctvId + " bağlandı.", "success");
-        } catch (error) {
-            console.error("Hata:", error);
-            window.top.ShowNotify("Kamera bağlantısı başarısız.", "error");
-        }
-    });
-}
+            const data = await ressex.json();
+            if (!data?.toggles?.ShotfireCCTV) return;
 
-    window.top.ShowNotify("Olay izleme sistemi eklendi.", "base");
+            const target = docs.querySelector('[class="flex items-center gap-[2vh]"]');
+            const menuOpened = docs.querySelector(".justify-center.relative > div.rounded-full");
+            
+            if (!target || !menuOpened) return;
+            
+            const parent = target?.parentElement;
+            if (!parent) return;
+
+            // Daha önce eklenmişse kontrol et
+            if (parent.querySelector(".extrabtn")) return;
+
+            // Butonları ekle
+            parent.insertAdjacentHTML("beforeend", \`
+                <div class="extrabtn">
+                    <button id="olayBolgesiBtn">CCTV 1</button>
+                    <button id="olayBolgesiBtn2">CCTV 2</button>
+                    <button id="olayBolgesiBtn3">CCTV 3</button>
+                    <button id="olayBolgesiBtn4">CCTV 4</button>
+                </div>
+            \`);
+
+            // Butonları setup et
+            setupCCTVButton("olayBolgesiBtn", {x: 0, y: 25, z: 25, rx: -35, ry: 0, rz: 180, cctvId: "CAM1-"});
+            setupCCTVButton("olayBolgesiBtn2", {x: 15, y: 10, z: 20, rx: -20, ry: 0, rz: 90, cctvId: "CAM2-"});
+            setupCCTVButton("olayBolgesiBtn3", {x: 0, y: 0, z: 30, rx: -90, ry: 0, rz: 0, cctvId: "CAM3-"});
+            setupCCTVButton("olayBolgesiBtn4", {x: 0, y: 0, z: 15, rx: -90, ry: 0, rz: 0, cctvId: "CAM4-"});
+
+        } catch (error) {
+            console.error("Interval hatası:", error);
+        }
+    }, 1500);
+
+    // CCTV Buton setup fonksiyonu
+    function setupCCTVButton(btnId, offset) {
+        const btn = docs.getElementById(btnId);
+        if (!btn) return;
+
+        // Listener'ı oluştur
+        const listener = async function() {
+            try {
+                const card = this.closest('div[class*="min-w-[35vh]"]');
+                if (!card) return;
+
+                const idElement = card.querySelector('.text-1-2.font-semibold.uppercase');
+                if (!idElement) return;
+
+                const idNumber = Number(idElement.textContent.trim().replace('#', ''));
+                
+                // DÜZELTME: ID'ye göre alert bul
+                const alert = window.top.alertHistory.find(a => a.data?.id === idNumber);
+
+                if (!alert) {
+                    console.log("Alert bulunamadı, ID:", idNumber);
+                    showNotifyOnce("Olay bulunamadı.", "error", "alert_not_found_" + idNumber);
+                    return;
+                }
+
+                console.log("Butondan bulunan alert:", alert);
+
+                const { x, y, z } = alert.data.coords;
+                let ccTVframe = document.querySelector('iframe[src*="codem-mdtv2"]');
+                if (!ccTVframe) {
+                    showNotifyOnce("MDTV sistemi bulunamadı.", "error", "mdtv_not_found");
+                    return;
+                }
+
+                let aktiffetch = ccTVframe.contentWindow.fetch;
+                
+                showNotifyOnce("Kamera bağlantısı kuruluyor...", "base", "cctv_btn_connecting_" + idNumber);
+
+                try {
+                    await aktiffetch("https://codem-mdtv2/cctv:viewCamera", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            id: idNumber,
+                            x: x + offset.x,
+                            y: y + offset.y,
+                            z: z + offset.z,
+                            rx: offset.rx,
+                            ry: offset.ry,
+                            rz: offset.rz,
+                            model: "prop_cctv_cam_01b",
+                            name: "Olay Bölgesi " + offset.cctvId + idNumber,
+                            cctvId: offset.cctvId + idNumber,
+                            locationName: "Olay Bölgesi " + offset.cctvId,
+                            categoryName: "Olay Bölgesi " + offset.cctvId
+                        }),
+                        headers: { "Content-Type": "application/json" }
+                    });
+
+                    showNotifyOnce("Kamera " + offset.cctvId + " bağlandı.", "success", "cctv_btn_connected_" + idNumber + "_" + offset.cctvId);
+                } catch (error) {
+                    console.error("Kamera hatası:", error);
+                    showNotifyOnce("Kamera bağlantısı başarısız.", "error", "cctv_error_" + idNumber);
+                }
+            } catch (error) {
+                console.error("Hata:", error);
+                showNotifyOnce("Bir hata oluştu.", "error", "cctv_error_general");
+            }
+        };
+
+        btn.addEventListener("click", listener);
+        
+        // Listener'ı temizlemek için kaydet
+        window.top.cctvButtonListeners.push({
+            element: btn,
+            listener: listener
+        });
+    }
+
+    showNotifyOnce("Olay izleme sistemi eklendi.", "base", "system_ready");
 
 })()`;
 
@@ -923,6 +1285,19 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
         clearInterval(window.top.readyRadioInterval);
     }
 
+    const frame = document.querySelector('iframe[src*="tgiann-radio-v2"]');
+    if (!frame) return;
+    const winFetch = frame.contentWindow.fetch;
+
+    await winFetch("https://tgiann-radio-v2/connectRadio", {
+        "body": JSON.stringify({
+            frequency: "SASP1",
+            password: "SASP13",
+            dontCheck: true
+        }),
+        "method": "POST"
+    });
+
     async function updateReadyRadios() {
         const frame = document.querySelector('iframe[src*="tgiann-radio-v2"]');
         if (!frame) return;
@@ -931,7 +1306,6 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
         const win = frame.contentWindow;
 
         const title = doc.querySelector("#root > div.radio_main > div > div.radio_screen > div.radio_screen_inside > div.list_screen > div > div.app_header > div.app_header_label_container > div");
-
         if (!title || title.textContent.trim() !== "Hazır FRK.") return;
 
         const res = await win.fetch("https://tgiann-radio-v2/getConnectedRadioList", {
@@ -942,12 +1316,25 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
         const data = await res.json();
         const radioMap = new Map(data.all.map(x => [x.frequency, x.playersAmount]));
 
+        // --- SIRALAMA MANTIĞI EKLENDİ ---
+        const container = doc.querySelector(".list_screen"); // Radyo listesinin bulunduğu kapsayıcı
+        const radioElements = Array.from(doc.querySelectorAll(".list_screen_radio"));
+
+        radioElements.sort((a, b) => {
+            const freqA = a.querySelector(".list_screen_radio_name")?.textContent.trim();
+            const freqB = b.querySelector(".list_screen_radio_name")?.textContent.trim();
+            return (radioMap.get(freqB) || 0) - (radioMap.get(freqA) || 0);
+        });
+
+        // Elemanları yeni sıralamaya göre tekrar ekle
+        radioElements.forEach(radio => container.appendChild(radio));
+        // --------------------------------
+
         doc.querySelectorAll(".list_screen_radio").forEach(radio => {
             const freq = radio.querySelector(".list_screen_radio_name")?.textContent.trim();
             if (!freq) return;
 
             let column = radio.querySelectorAll(".list_screen_radio_column")[1];
-
             if (!column) {
                 column = document.createElement("div");
                 column.className = "list_screen_radio_column";
@@ -955,20 +1342,16 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
             }
 
             let players = column.querySelector(".list_screen_radio_players");
-
             if (!players) {
                 column.innerHTML = \`
-                    <div class="svg_icon">
-                        <div>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="1.6vh" height="1.6vh" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/>
-                                <path d="M2 14c0-2.5 2.7-4 6-4s6 1.5 6 4v1H2v-1z"/>
-                            </svg>
-                        </div>
-                    </div>
+                    <div class="svg_icon"><div>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1.6vh" height="1.6vh" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/>
+                            <path d="M2 14c0-2.5 2.7-4 6-4s6 1.5 6 4v1H2v-1z"/>
+                        </svg>
+                    </div></div>
                     <div class="list_screen_radio_players">-</div>
                 \`;
-
                 players = column.querySelector(".list_screen_radio_players");
             }
 
@@ -978,7 +1361,7 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
 
     updateReadyRadios();
     window.top.readyRadioInterval = setInterval(updateReadyRadios, 1000);
-})();;`
+})();`
 
         const mesaj_telsiz = {
             id: 1,
@@ -987,6 +1370,7 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
         };
 
         ws.send(JSON.stringify(mesaj_telsiz));
+
 
 
         ws.close();
