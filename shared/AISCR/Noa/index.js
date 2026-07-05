@@ -862,51 +862,75 @@ window.top.sendNoaChat = function (type, message) {
         ws.send(JSON.stringify(mesaj_cctv_clean));
 
         const Alert = `(async function(){
+    // Sistem zaten açık mı kontrol et - ÇIKARSA HEMEN DURDUR
+    if (window.top.__AlertSystemActive) {
+        console.warn("Alert sistemi zaten aktif! Yeniden başlatılmıyor.");
+        return;
+    }
+    window.top.__AlertSystemActive = true;
+
     // Temizlik fonksiyonu - alertHistory KORUNUR
     function cleanup() {
-        // NUI listener'ları temizle
-        if (window.top.nuiPacketListener) {
-            const noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
-            if (noaUIFrame) {
-                const windoww = noaUIFrame.contentWindow;
-                windoww.removeEventListener("message", window.top.nuiPacketListener);
+        console.log("Temizlik başlıyor...");
+
+        // NUI listener'ını temizle - REFERANSI KONTROL ET
+        if (window.top.nuiPacketListener && window.top.nuiPacketListenerTarget) {
+            try {
+                window.top.nuiPacketListenerTarget.removeEventListener("message", window.top.nuiPacketListener);
+                console.log("NUI listener kaldırıldı");
+            } catch(e) {
+                console.error("NUI listener kaldırma hatası:", e);
             }
             delete window.top.nuiPacketListener;
+            delete window.top.nuiPacketListenerTarget;
         }
 
-        // Message listener'ı temizle
-        if (window.top.__MSGnuiMessageListener) {
-            const targetWindow = document.querySelector('iframe[src*="tgiann-chat"]') || document.querySelector('iframe[name*="tgiann-chat"]');
-            if (targetWindow) {
-                const tw = targetWindow.contentWindow || targetWindow.contentDocument;
-                tw.removeEventListener("message", window.top.__MSGnuiMessageListener);
+        // Message listener'ını temizle - REFERANSI KONTROL ET
+        if (window.top.__MSGnuiMessageListener && window.top.__MSGnuiMessageListenerTarget) {
+            try {
+                window.top.__MSGnuiMessageListenerTarget.removeEventListener("message", window.top.__MSGnuiMessageListener);
+                console.log("Message listener kaldırıldı");
+            } catch(e) {
+                console.error("Message listener kaldırma hatası:", e);
             }
             delete window.top.__MSGnuiMessageListener;
+            delete window.top.__MSGnuiMessageListenerTarget;
         }
 
         // Interval'ı temizle
         if (window.top.olayBtnInterval) {
             clearInterval(window.top.olayBtnInterval);
             delete window.top.olayBtnInterval;
+            console.log("Interval kaldırıldı");
         }
 
         // Buton click listener'larını temizle
         if (window.top.cctvButtonListeners) {
             window.top.cctvButtonListeners.forEach(({ element, listener }) => {
-                element.removeEventListener("click", listener);
+                try {
+                    element.removeEventListener("click", listener);
+                } catch(e) {
+                    console.error("Buton listener kaldırma hatası:", e);
+                }
             });
             delete window.top.cctvButtonListeners;
+            console.log("Buton listener'ları kaldırıldı");
         }
 
         // CSS ve butonları DOM'dan temizle
         const noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
         if (noaUIFrame) {
-            const docs = noaUIFrame.contentDocument || noaUIFrame.contentWindow.document;
-            const style = docs.getElementById("extrabtn-style");
-            if (style) style.remove();
+            try {
+                const docs = noaUIFrame.contentDocument || noaUIFrame.contentWindow.document;
+                const style = docs.getElementById("extrabtn-style");
+                if (style) style.remove();
 
-            const extraBtn = docs.querySelector(".extrabtn");
-            if (extraBtn) extraBtn.remove();
+                const extraBtn = docs.querySelector(".extrabtn");
+                if (extraBtn) extraBtn.remove();
+                console.log("CSS ve butonlar kaldırıldı");
+            } catch(e) {
+                console.error("DOM temizleme hatası:", e);
+            }
         }
 
         // Bildirim zamanlayıcılarını temizle
@@ -914,7 +938,12 @@ window.top.sendNoaChat = function (type, message) {
             window.top.notifyTimeouts.forEach(timeout => clearTimeout(timeout));
             delete window.top.notifyTimeouts;
         }
+
+        window.top.__AlertSystemActive = false;
     }
+
+    // Sayfa kapatılırken temizlik yap
+    window.top.addEventListener("beforeunload", cleanup);
 
     // ShowNotify wrapper - aynı bildirimin tekrarını engelle
     function showNotifyOnce(message, type, key) {
@@ -929,8 +958,8 @@ window.top.sendNoaChat = function (type, message) {
             return;
         }
 
-        window.top.notifyCache[cacheKey] = Date.now();
         window.top.ShowNotify(message, type);
+        window.top.notifyCache[cacheKey] = Date.now();
 
         // 3 saniye sonra cache'i temizle
         if (!window.top.notifyTimeouts) {
@@ -952,11 +981,6 @@ window.top.sendNoaChat = function (type, message) {
     
     // Eğer alertHistory varsa geri yükle, yoksa yeni oluştur
     window.top.alertHistory = savedAlertHistory || [];
-    
-    // notifyCache'i temizle
-    if (window.top.notifyCache) {
-        delete window.top.notifyCache;
-    }
 
     window.top.ShowNotify("Olay izleme sistemi ekleniyor...", "base");
 
@@ -967,6 +991,15 @@ window.top.sendNoaChat = function (type, message) {
     // PoliceAlert iframe'ini bul
     let noaUIFrame = document.querySelector('iframe[src*="tgiann-policealert"]');
     let windoww = noaUIFrame.contentWindow;
+
+    // ESKI LISTENER'I KONTROL ET VE SİL
+    if (TargetWindow.__MSGnuiMessageListener) {
+        try {
+            TargetWindow.removeEventListener("message", TargetWindow.__MSGnuiMessageListener);
+        } catch(e) {
+            console.warn("Eski listener silinirken hata:", e);
+        }
+    }
 
     // Yeni message listener oluştur
     TargetWindow.__MSGnuiMessageListener = async function (event) {
@@ -1003,28 +1036,27 @@ window.top.sendNoaChat = function (type, message) {
 
                 // Kamera offset'leri
                 const cameraOffsets = [
-    // İlk 20 (mevcut)
-    { x: 0,   y: 25,  z: 25, rx: -35, ry: 0, rz: 180, cctvId: "CAM1-"  },
-    { x: 15,  y: 10,  z: 20, rx: -20, ry: 0, rz: 90,  cctvId: "CAM2-"  },
-    { x: 0,   y: 0,   z: 30, rx: -90, ry: 0, rz: 0,   cctvId: "CAM3-"  },
-    { x: 0,   y: 0,   z: 15, rx: -90, ry: 0, rz: 0,   cctvId: "CAM4-"  },
-    { x: -20, y: 0,   z: 18, rx: -20, ry: 0, rz: 270, cctvId: "CAM5-"  },
-    { x: 20,  y: 0,   z: 18, rx: -20, ry: 0, rz: 90,  cctvId: "CAM6-"  },
-    { x: 0,   y: -20, z: 18, rx: -20, ry: 0, rz: 0,   cctvId: "CAM7-"  },
-    { x: 0,   y: 20,  z: 18, rx: -20, ry: 0, rz: 180, cctvId: "CAM8-"  },
-    { x: 15,  y: 15,  z: 20, rx: -25, ry: 0, rz: 135, cctvId: "CAM9-"  },
-    { x: -15, y: 15,  z: 20, rx: -25, ry: 0, rz: 225, cctvId: "CAM10-" },
-    { x: 15,  y: -15, z: 20, rx: -25, ry: 0, rz: 45,  cctvId: "CAM11-" },
-    { x: -15, y: -15, z: 20, rx: -25, ry: 0, rz: 315, cctvId: "CAM12-" },
-    { x: 35,  y: 0,   z: 30, rx: -35, ry: 0, rz: 90,  cctvId: "CAM13-" },
-    { x: -35, y: 0,   z: 30, rx: -35, ry: 0, rz: 270, cctvId: "CAM14-" },
-    { x: 0,   y: 35,  z: 30, rx: -35, ry: 0, rz: 180, cctvId: "CAM15-" },
-    { x: 0,   y: -35, z: 30, rx: -35, ry: 0, rz: 0,   cctvId: "CAM16-" },
-    { x: 8,   y: 8,   z: 45, rx: -75, ry: 0, rz: 135, cctvId: "CAM17-" },
-    { x: -8,  y: 8,   z: 45, rx: -75, ry: 0, rz: 225, cctvId: "CAM18-" },
-    { x: 8,   y: -8,  z: 45, rx: -75, ry: 0, rz: 45,  cctvId: "CAM19-" },
-    { x: -8,  y: -8,  z: 45, rx: -75, ry: 0, rz: 315, cctvId: "CAM20-" },
-];
+                    { x: 0,   y: 25,  z: 25, rx: -35, ry: 0, rz: 180, cctvId: "CAM1-"  },
+                    { x: 15,  y: 10,  z: 20, rx: -20, ry: 0, rz: 90,  cctvId: "CAM2-"  },
+                    { x: 0,   y: 0,   z: 30, rx: -90, ry: 0, rz: 0,   cctvId: "CAM3-"  },
+                    { x: 0,   y: 0,   z: 15, rx: -90, ry: 0, rz: 0,   cctvId: "CAM4-"  },
+                    { x: -20, y: 0,   z: 18, rx: -20, ry: 0, rz: 270, cctvId: "CAM5-"  },
+                    { x: 20,  y: 0,   z: 18, rx: -20, ry: 0, rz: 90,  cctvId: "CAM6-"  },
+                    { x: 0,   y: -20, z: 18, rx: -20, ry: 0, rz: 0,   cctvId: "CAM7-"  },
+                    { x: 0,   y: 20,  z: 18, rx: -20, ry: 0, rz: 180, cctvId: "CAM8-"  },
+                    { x: 15,  y: 15,  z: 20, rx: -25, ry: 0, rz: 135, cctvId: "CAM9-"  },
+                    { x: -15, y: 15,  z: 20, rx: -25, ry: 0, rz: 225, cctvId: "CAM10-" },
+                    { x: 15,  y: -15, z: 20, rx: -25, ry: 0, rz: 45,  cctvId: "CAM11-" },
+                    { x: -15, y: -15, z: 20, rx: -25, ry: 0, rz: 315, cctvId: "CAM12-" },
+                    { x: 35,  y: 0,   z: 30, rx: -35, ry: 0, rz: 90,  cctvId: "CAM13-" },
+                    { x: -35, y: 0,   z: 30, rx: -35, ry: 0, rz: 270, cctvId: "CAM14-" },
+                    { x: 0,   y: 35,  z: 30, rx: -35, ry: 0, rz: 180, cctvId: "CAM15-" },
+                    { x: 0,   y: -35, z: 30, rx: -35, ry: 0, rz: 0,   cctvId: "CAM16-" },
+                    { x: 8,   y: 8,   z: 45, rx: -75, ry: 0, rz: 135, cctvId: "CAM17-" },
+                    { x: -8,  y: 8,   z: 45, rx: -75, ry: 0, rz: 225, cctvId: "CAM18-" },
+                    { x: 8,   y: -8,  z: 45, rx: -75, ry: 0, rz: 45,  cctvId: "CAM19-" },
+                    { x: -8,  y: -8,  z: 45, rx: -75, ry: 0, rz: 315, cctvId: "CAM20-" },
+                ];
 
                 const offsetIndex = Number(args[1]) || 0;
                 const offsetSet = cameraOffsets[offsetIndex] || cameraOffsets[0];
@@ -1073,7 +1105,19 @@ window.top.sendNoaChat = function (type, message) {
         }
     };
 
+    // Listener'ı kaydet ve ekle
+    window.top.__MSGnuiMessageListener = TargetWindow.__MSGnuiMessageListener;
+    window.top.__MSGnuiMessageListenerTarget = TargetWindow;
     TargetWindow.addEventListener("message", TargetWindow.__MSGnuiMessageListener);
+
+    // ESKI NUI LISTENER'I KONTROL ET VE SİL
+    if (window.top.nuiPacketListener && window.top.nuiPacketListenerTarget) {
+        try {
+            window.top.nuiPacketListenerTarget.removeEventListener("message", window.top.nuiPacketListener);
+        } catch(e) {
+            console.warn("Eski NUI listener silinirken hata:", e);
+        }
+    }
 
     // NUI packet listener - alertHistory'e ekle
     window.top.nuiPacketListener = function (event) {
@@ -1095,6 +1139,8 @@ window.top.sendNoaChat = function (type, message) {
         }
     };
 
+    // Listener'ı kaydet ve ekle
+    window.top.nuiPacketListenerTarget = windoww;
     windoww.addEventListener("message", window.top.nuiPacketListener);
 
     // Dokümanı al
