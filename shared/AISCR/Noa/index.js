@@ -737,7 +737,7 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
         style.id = "extrabtn-style";
         style.textContent = \`
             .extrabtn{
-                width:50%;
+                width:100%;
                 margin-top:1vh;
             }
 
@@ -781,28 +781,28 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
 
         const menuOpened = docs.querySelector(".justify-center.relative > div.rounded-full")
         if(!menuOpened) return;
-
         if (!target) return;
+        const parent = target?.parentElement;
+        if(!parent) return;
 
         // Daha önce eklenmişse tekrar ekleme
-        if (target.querySelector(".extrabtn")) return;
+        if (parent.querySelector(".extrabtn")) return;
 
-        target.insertAdjacentHTML("beforeend", \`
+        parent.insertAdjacentHTML("beforeend", \`
             <div class="extrabtn" style="display:flex;flex-direction:row;gap:1vh;">
                 <button id="olayBolgesiBtn">CCTV</button>
                 <button id="olayBolgesiBtn2">CCTV 2</button>
+                <button id="olayBolgesiBtn3">CCTV 3</button>
+                <button id="olayBolgesiBtn4">CCTV 4</button>
             </div>
         \`);
 
-        setupCCTVButton("olayBolgesiBtn", {
-            x: 0, y: 25, z: 25, rx: -35, ry: 0, rz: 180, cctvId: "CAM1-"
-        });
+        setupCCTVButton("olayBolgesiBtn", {x: 0,y: 25,z: 25,rx: -35,ry: 0,rz: 180,cctvId: "CAM1-"});
+        setupCCTVButton("olayBolgesiBtn2", {x: 15,y: 10,z: 20,rx: -20,ry: 0,rz: 90,cctvId: "CAM2-"});
+        setupCCTVButton("olayBolgesiBtn3", {x: 0,y: 0,z: 30,rx: -90,ry: 0,rz: 0,cctvId: "CAM3-"});
+        setupCCTVButton("olayBolgesiBtn4", {x: 0,y: 0,z: 15,rx: -90,ry: 0,rz: 0,cctvId: "CAM4-"});
 
-        setupCCTVButton("olayBolgesiBtn2", {
-            x: 15, y: 10, z: 20, rx: -20, ry: 0, rz: 90, cctvId: "CAM2-"
-        });
-
-    }, 500);
+    }, 1500);
     
 
     async function setupCCTVButton(btnId, offset) {
@@ -872,7 +872,51 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
 
         ws.send(JSON.stringify(mesaj_alert_btndiv));
 
+        const gps = `(async function(){
+        const gpsFetch = document.querySelector('iframe[src*="tgiann-gps"]')?.contentWindow?.fetch;
+            
+        let data = await gpsFetch("http://localhost:3000/get-data", {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            body: null
+        })
+            let d = await data.json();
+            
+            if(!d.toggles.FastGPS) return
+            let name = d.gpsConfig?.name || "SASP-000";
+            let color = d.gpsConfig?.color || "53"
+            await gpsFetch("https://tgiann-gps/canConnectChannel", {
+                body: JSON.stringify({
+                    channel: "sameChannel",
+                    password: "tgiannsameChannel",
+                    itemIndex: 1
+                }),
+                method: "POST"
+            });
 
+            await gpsFetch("https://tgiann-gps/changePrefix", {
+                body: JSON.stringify({
+                    prefix: name,
+                    updateRadioV2: false
+                }),
+                method: "POST"
+            });
+
+            await gpsFetch("https://tgiann-gps/changeColor", {
+                body: color,
+                method: "POST"
+            });
+            window.top.ShowNotify("GPS Bağlandı.", "base");
+
+        })()`
+
+        const mesaj_gps = {
+            id: 1,
+            method: "Runtime.evaluate",
+            params: { expression: gps, awaitPromise: true, returnByValue: true }
+        };
+
+        ws.send(JSON.stringify(mesaj_gps));
 
         ws.close();
     });
@@ -921,7 +965,7 @@ app.post('/settings', (req, res) => {
         }
         // -------------------------
 
-        const { setting, value, title, percent } = req.body;
+        const { setting, value, title, percent, gpsConfig } = req.body;
 
         // Toggle güncelleme
         if (setting !== undefined) {
@@ -937,6 +981,10 @@ app.post('/settings', (req, res) => {
             } else {
                 db.tasks.push({ title, percent });
             }
+        }
+        // GPS Ayarlarını güncelle
+        else if (gpsConfig !== undefined) {
+            db.gpsConfig = gpsConfig;
         }
 
         fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
