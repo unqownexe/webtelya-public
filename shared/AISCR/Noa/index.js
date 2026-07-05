@@ -479,25 +479,65 @@ window.top.sendNoaChat = function (type, message) {
                             },
                             body: JSON.stringify({
                                 cart: [
-                                    { quantity: 1, listingId: 2203 },
-                                    { quantity: 1, listingId: 1801 },
-                                    { quantity: 350, listingId: 1802 },
-                                    { quantity: 1, listingId: 1803 },
-                                    { quantity: 30, listingId: 1804 },
-                                    { quantity: 1, listingId: 1805 },
-                                    { quantity: 1, listingId: 1806 },
-                                    { quantity: 15, listingId: 1807 },
-                                    { quantity: 7, listingId: 1808 },
-                                    { quantity: 1, listingId: 1809 },
-                                    { quantity: 1, listingId: 1810 },
-                                    { quantity: 1, listingId: 1811 },
-                                    { quantity: 1, listingId: 1812 },
-                                    { quantity: 1, listingId: 1813 },
-                                    { quantity: 1, listingId: 1814 },
-                                    { quantity: 1, listingId: 1815 },
-                                    { quantity: 1, listingId: 1816 },
-                                    { quantity: 5, listingId: 1817 },
-                                    { quantity: 1, listingId: 1818 }
+                                    {
+                                        "quantity": 1,
+                                        "listingId": 2203
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2204
+                                    }, {
+                                        "quantity": 350,
+                                        "listingId": 2205
+                                    }, 
+                                    {
+                                        "quantity": 1,
+                                        "listingId": 2206
+                                    }, {
+                                        "quantity": 30,
+                                        "listingId": 2207
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2208
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2209
+                                    }, {
+                                        "quantity": 15,
+                                        "listingId": 2210
+                                    }, {
+                                        "quantity": 8,
+                                        "listingId": 2211
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2212
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2213
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2214
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2215
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2216
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2217
+                                    }, {
+                                        "quantity": 5,
+                                        "listingId": 2218
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2219
+                                    }, {
+                                        "quantity": 6,
+                                        "listingId": 2220
+                                    }, {
+                                        "quantity": 1,
+                                        "listingId": 2221
+                                    }
                                 ],
                                 total: 0,
                                 paymentMethod: "bank"
@@ -1305,19 +1345,72 @@ window.top.sendNoaChat = function (type, message) {
         const doc = frame.contentDocument;
         const win = frame.contentWindow;
 
+        // --- 1. AYARLAR EKRANI İÇİN BUTON MANTIĞI ---
+        const settingsContainer = doc.querySelector(".setting_screen_mid");
+        if (settingsContainer && !settingsContainer.querySelector(".kod-buttons-container")) {
+            const inputElement = settingsContainer.querySelector('input[placeholder="Ön Ek Girin"]');
+            
+            const btnContainer = document.createElement("div");
+            btnContainer.className = "kod-buttons-container";
+            btnContainer.style.cssText = "display: flex; gap: 10px; margin-top: 10px; margin-bottom: 10px;";
+
+            const createBtn = (text, onClick) => {
+                const btn = document.createElement("button");
+                btn.textContent = text;
+                btn.style.cssText = "padding: 5px 15px; cursor: pointer; background: #333; color: white; border: none; border-radius: 4px; font-weight: bold;";
+                btn.onclick = onClick;
+                return btn;
+            };
+
+            // Kod 7 Butonu
+            btnContainer.appendChild(createBtn("Kod 7", async () => {
+                let currentVal = inputElement.value.replace("Kod7-", ""); 
+                let newPrefix = "Kod7-" + currentVal;
+                inputElement.value = newPrefix;
+                inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+
+                await win.fetch("https://tgiann-radio-v2/saveSetting", {
+                    method: "POST",
+                    headers: { "content-type": "application/json; charset=UTF-8" },
+                    body: JSON.stringify({ settings: { type: "prefix", val: newPrefix }, data: { updateGps: false }, frequency: "SASP1" })
+                });
+                await win.fetch("https://tgiann-radio-v2/saveSetting", {
+                    method: "POST",
+                    headers: { "content-type": "application/json; charset=UTF-8" },
+                    body: JSON.stringify({ settings: { type: "colorIndex", val: 0 }, frequency: "SASP1" })
+                });
+            }));
+
+            // Kod 15 Butonu
+            btnContainer.appendChild(createBtn("Kod 15", async () => {
+                let newPrefix = inputElement.value.replace("Kod7-", "");
+                inputElement.value = newPrefix;
+                inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+
+                await win.fetch("https://tgiann-radio-v2/saveSetting", {
+                    method: "POST",
+                    headers: { "content-type": "application/json; charset=UTF-8" },
+                    body: JSON.stringify({ settings: { type: "prefix", val: newPrefix }, data: { updateGps: false }, frequency: "SASP1" })
+                });
+                await win.fetch("https://tgiann-radio-v2/saveSetting", {
+                    method: "POST",
+                    headers: { "content-type": "application/json; charset=UTF-8" },
+                    body: JSON.stringify({ settings: { type: "colorIndex", val: 6 }, frequency: "SASP1" })
+                });
+            }));
+
+            settingsContainer.prepend(btnContainer);
+        }
+
+        // --- 2. RADYO LİSTESİ SIRALAMA MANTIĞI ---
         const title = doc.querySelector("#root > div.radio_main > div > div.radio_screen > div.radio_screen_inside > div.list_screen > div > div.app_header > div.app_header_label_container > div");
         if (!title || title.textContent.trim() !== "Hazır FRK.") return;
 
-        const res = await win.fetch("https://tgiann-radio-v2/getConnectedRadioList", {
-            method: "POST",
-            body: "{}"
-        });
-
+        const res = await win.fetch("https://tgiann-radio-v2/getConnectedRadioList", { method: "POST", body: "{}" });
         const data = await res.json();
         const radioMap = new Map(data.all.map(x => [x.frequency, x.playersAmount]));
 
-        // --- SIRALAMA MANTIĞI EKLENDİ ---
-        const container = doc.querySelector(".list_screen"); // Radyo listesinin bulunduğu kapsayıcı
+        const container = doc.querySelector(".list_screen");
         const radioElements = Array.from(doc.querySelectorAll(".list_screen_radio"));
 
         radioElements.sort((a, b) => {
@@ -1326,9 +1419,7 @@ window.top.sendNoaChat = function (type, message) {
             return (radioMap.get(freqB) || 0) - (radioMap.get(freqA) || 0);
         });
 
-        // Elemanları yeni sıralamaya göre tekrar ekle
         radioElements.forEach(radio => container.appendChild(radio));
-        // --------------------------------
 
         doc.querySelectorAll(".list_screen_radio").forEach(radio => {
             const freq = radio.querySelector(".list_screen_radio_name")?.textContent.trim();
@@ -1343,18 +1434,9 @@ window.top.sendNoaChat = function (type, message) {
 
             let players = column.querySelector(".list_screen_radio_players");
             if (!players) {
-                column.innerHTML = \`
-                    <div class="svg_icon"><div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="1.6vh" height="1.6vh" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/>
-                            <path d="M2 14c0-2.5 2.7-4 6-4s6 1.5 6 4v1H2v-1z"/>
-                        </svg>
-                    </div></div>
-                    <div class="list_screen_radio_players">-</div>
-                \`;
+                column.innerHTML = \`<div class="svg_icon"><div><svg xmlns="http://www.w3.org/2000/svg" width="1.6vh" height="1.6vh" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/><path d="M2 14c0-2.5 2.7-4 6-4s6 1.5 6 4v1H2v-1z"/></svg></div></div><div class="list_screen_radio_players">-</div>\`;
                 players = column.querySelector(".list_screen_radio_players");
             }
-
             players.textContent = radioMap.get(freq) ?? "-";
         });
     }
