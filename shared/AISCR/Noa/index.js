@@ -95,7 +95,7 @@ async function main() {
     }
     if (!ws_url) {
         console.log("❌ Telefon veya oyun arayüzü bulunamadı.");
-        process.exit(1);
+        throw new Error("Telefon veya oyun arayüzü bulunamadı.");
     }
 
 
@@ -930,7 +930,7 @@ function fetchTargets() {
             res.on('end', () => resolve(JSON.parse(data)));
         }).on('error', () => {
             console.log("❌ FiveM yerel sunucusuna bağlanılamadı.");
-            process.exit(1);
+            reject(new Error("FiveM yerel sunucusuna bağlanılamadı."));
         });
     });
 }
@@ -997,3 +997,13 @@ app.post('/settings', (req, res) => {
 });
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'settings.html')));
+
+app.post('/restart-scripts', async (req, res) => {
+    try {
+        await main();
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Yeniden başlatma hatası:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
