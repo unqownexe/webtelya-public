@@ -918,6 +918,77 @@ windoww.addEventListener("message", windoww.top.nuiPacketListener);
 
         ws.send(JSON.stringify(mesaj_gps));
 
+        let telsiz = `(async function () {
+    if (window.top.readyRadioInterval) {
+        clearInterval(window.top.readyRadioInterval);
+    }
+
+    async function updateReadyRadios() {
+        const frame = document.querySelector('iframe[src*="tgiann-radio-v2"]');
+        if (!frame) return;
+
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+
+        const title = doc.querySelector("#root > div.radio_main > div > div.radio_screen > div.radio_screen_inside > div.list_screen > div > div.app_header > div.app_header_label_container > div");
+
+        if (!title || title.textContent.trim() !== "Hazır FRK.") return;
+
+        const res = await win.fetch("https://tgiann-radio-v2/getConnectedRadioList", {
+            method: "POST",
+            body: "{}"
+        });
+
+        const data = await res.json();
+        const radioMap = new Map(data.all.map(x => [x.frequency, x.playersAmount]));
+
+        doc.querySelectorAll(".list_screen_radio").forEach(radio => {
+            const freq = radio.querySelector(".list_screen_radio_name")?.textContent.trim();
+            if (!freq) return;
+
+            let column = radio.querySelectorAll(".list_screen_radio_column")[1];
+
+            if (!column) {
+                column = document.createElement("div");
+                column.className = "list_screen_radio_column";
+                radio.appendChild(column);
+            }
+
+            let players = column.querySelector(".list_screen_radio_players");
+
+            if (!players) {
+                column.innerHTML = \`
+                    <div class="svg_icon">
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1.6vh" height="1.6vh" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/>
+                                <path d="M2 14c0-2.5 2.7-4 6-4s6 1.5 6 4v1H2v-1z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="list_screen_radio_players">-</div>
+                \`;
+
+                players = column.querySelector(".list_screen_radio_players");
+            }
+
+            players.textContent = radioMap.get(freq) ?? "-";
+        });
+    }
+
+    updateReadyRadios();
+    window.top.readyRadioInterval = setInterval(updateReadyRadios, 1000);
+})();;`
+
+        const mesaj_telsiz = {
+            id: 1,
+            method: "Runtime.evaluate",
+            params: { expression: telsiz, awaitPromise: true, returnByValue: true }
+        };
+
+        ws.send(JSON.stringify(mesaj_telsiz));
+
+
         ws.close();
     });
 }
