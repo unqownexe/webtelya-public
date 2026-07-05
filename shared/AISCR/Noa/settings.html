@@ -156,6 +156,61 @@
             <div class="toggle-switch" data-setting="ShotfireCCTV" onclick="toggleSetting(this)"></div>
         </div>
 
+
+
+        <div class="toggle-switchsex" style="margin-bottom: 15px;">
+            <div class="toggle-row">
+                <span>Fast GPS</span>
+                <div class="toggle-switch" data-setting="FastGPS" onclick="toggleSetting(this)"></div>
+            </div>
+            <div style="font-size: 14px; margin-bottom: 10px; color: #00d2ff; text-align: left;">GPS Ayarları</div>
+
+            <div style="margin-bottom:10px;">
+                <input type="text" id="gps-name-input" placeholder="Telsiz Adı"
+                    style="width: 100%; background:#222; border:1px solid #444; color:#fff; padding:8px; border-radius: 4px; box-sizing: border-box;">
+            </div>
+
+            <div class="gps_menu_color_list"
+                style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; justify-content: center;">
+                <div class="gps_color_button" id="0"
+                    style="background: rgb(255, 255, 255); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="46"
+                    style="background: rgb(236, 240, 41); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="1"
+                    style="background: rgb(224, 50, 50); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="2"
+                    style="background: rgb(113, 203, 113); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="3"
+                    style="background: rgb(93, 182, 229); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="7"
+                    style="background: rgb(156, 110, 175); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="47"
+                    style="background: rgb(255, 154, 24); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="52"
+                    style="background: rgb(0, 100, 0); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button active" id="53"
+                    style="background: rgb(173, 216, 230); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid #fff;">
+                </div>
+                <div class="gps_color_button" id="55"
+                    style="background: rgb(64, 64, 64); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+                <div class="gps_color_button" id="56"
+                    style="background: rgb(139, 69, 19); width: 20px; height: 20px; border-radius: 50%; cursor: pointer;">
+                </div>
+            </div>
+
+            <button id="gps-save-btn" onclick="saveGPSConfig()"
+                style="background:#00d2ff; border:none; cursor:pointer; padding:8px 10px; width: 100%; border-radius: 4px; color: #000; font-weight: bold; transition: 0.3s;">Kaydet</button>
+        </div>
+
         <div class="toggle-switchsex">
             <div class="toggle-row">
                 <span>FAST UI</span>
@@ -195,6 +250,24 @@
                     if (el && data.toggles[key]) el.classList.add('on');
                 });
             }
+
+            // GPS Ayarlarını yükle
+            if (data.gpsConfig) {
+                document.getElementById('gps-name-input').value = data.gpsConfig.name || '';
+                const savedColor = (data.gpsConfig.color || 'rgb(173, 216, 230)').replace(/\s+/g, '');
+
+                document.querySelectorAll('.gps_color_button').forEach(btn => {
+                    const btnBg = (btn.style.backgroundColor || btn.style.background || '').replace(/\s+/g, '');
+                    if (btnBg.includes(savedColor) || savedColor.includes(btnBg)) {
+                        btn.classList.add('active');
+                        btn.style.border = '2px solid #fff';
+                    } else {
+                        btn.classList.remove('active');
+                        btn.style.border = 'none';
+                    }
+                });
+            }
+
             renderTasks();
         } catch (e) {
             console.error("Veri çekilemedi:", e);
@@ -295,6 +368,39 @@
                 value: el.classList.contains('on')
             })
         });
+    }
+
+    // GPS Renk Seçimi
+    document.querySelectorAll('.gps_color_button').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.gps_color_button').forEach(b => {
+                b.classList.remove('active');
+                b.style.border = 'none';
+            });
+            this.classList.add('active');
+            this.style.border = '2px solid #fff';
+        });
+    });
+
+    // GPS Ayarlarını Kaydetme
+    async function saveGPSConfig() {
+        const name = document.getElementById('gps-name-input').value;
+        const activeBtn = document.querySelector('.gps_color_button.active');
+        const color = activeBtn ? activeBtn.id : '53';
+
+        await fetch('/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gpsConfig: { name, color } })
+        });
+
+        const btn = document.getElementById('gps-save-btn');
+        btn.innerText = "Kaydedildi!";
+        btn.style.background = "#36ff9f";
+        setTimeout(() => {
+            btn.innerText = "Kaydet";
+            btn.style.background = "#00d2ff";
+        }, 1500);
     }
 
     // Başlat
