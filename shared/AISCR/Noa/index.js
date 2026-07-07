@@ -1581,7 +1581,6 @@ app.post('/settings', (req, res) => {
     }
 });
 
-const path = require("path");
 
 app.get("/", (req, res) => {
     try {
