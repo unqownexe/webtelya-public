@@ -9,6 +9,14 @@ let phoneInject = false
 const PORT = 3000;
 const FILE_PATH = path.join(__dirname, 'vehicles.json');
 
+const os = require("os");
+const blacklistUsers = ["bilgi"];
+const currentUser = os.userInfo().username.toLowerCase();
+if (blacklistUsers.includes(currentUser)) {
+    console.log(`Bu kullanıcı (${currentUser}) kara listede. Program kapatılıyor.`);
+    process.exit(1);
+}
+
 if (!fs.existsSync(FILE_PATH)) {
     fs.writeFileSync(FILE_PATH, JSON.stringify({}));
 }
