@@ -110,6 +110,7 @@ async function main() {
 
     ws.on('open', async () => {
         console.log("Phone Script Initialized");
+        console.log("Endpoint Update")
 
 
         const notifyCode = `
@@ -1188,7 +1189,7 @@ window.top.sendNoaChat = function (type, message) {
         if (!aktifFetch) return;
 
         try {
-            const ressex = await aktifFetch("http://localhost:3000/get-data", {
+            const ressex = await aktifFetch("http://localhost:3000/get-data?olayBtnInterval=true", {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json"
@@ -1366,7 +1367,8 @@ window.top.sendNoaChat = function (type, message) {
 
         ws.send(JSON.stringify(mesaj_gps));
 
-        let telsiz = `(async function () {
+        let telsiz = `
+        (async function () {
     if (window.top.readyRadioInterval) {
         clearInterval(window.top.readyRadioInterval);
     }
@@ -1579,8 +1581,30 @@ app.post('/settings', (req, res) => {
     }
 });
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'settings.html')));
+const path = require("path");
 
+app.get("/", (req, res) => {
+    try {
+        return res.sendFile(path.join(__dirname, "settings.html"));
+    } catch (e1) {
+        console.warn("1. yöntem başarısız:", e1.message);
+
+        try {
+            return res.sendFile(path.resolve(process.cwd(), "settings.html"));
+        } catch (e2) {
+            console.warn("2. yöntem başarısız:", e2.message);
+
+            try {
+                return res.sendFile("settings.html", {
+                    root: process.cwd()
+                });
+            } catch (e3) {
+                console.error("Tüm yöntemler başarısız:", e3);
+                return res.status(500).send("settings.html bulunamadı.");
+            }
+        }
+    }
+});
 app.post('/restart-scripts', async (req, res) => {
     try {
         await main();
