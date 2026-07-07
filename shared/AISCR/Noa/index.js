@@ -22,7 +22,8 @@ if (!fs.existsSync(FILE_PATH)) {
 }
 app.use(cors());
 app.use(express.json());
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const readData = () => {
     if (!fs.existsSync(FILE_PATH)) {
         fs.writeFileSync(FILE_PATH, JSON.stringify({}));
@@ -270,6 +271,17 @@ window.top.sendNoaChat = function (type, message) {
         const fpsBoost = `
         (async function() {
 
+      const aktifFetch = document.querySelector('iframe[src*="noa-ui"]')?.contentWindow?.fetch;
+      const ressex = await aktifFetch("http://localhost:3000/get-data?FPSBoost=true", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+        const data = await ressex.json();
+        console.log(data?.toggles?.FPSBoost)
+        if (!data?.toggles?.FPSBoost) return window.top.ShowNotify("FPS Boost kapalı.", "info");
+
         const BlackList = [
             "gnd_mechanic",
             "WaveShield",
@@ -277,10 +289,8 @@ window.top.sendNoaChat = function (type, message) {
         ];
 
         document.querySelectorAll("iframe").forEach(script => {
-            
             const name = script.getAttribute("name");
             //window.top.ShowNotify(name, "base");
-
             if (BlackList.includes(name)) {
                script.remove();
                window.top.ShowNotify(name + " | Deleted.", "base");
@@ -1395,6 +1405,14 @@ window.top.sendNoaChat = function (type, message) {
         "method": "POST"
     });
 
+
+    let respp = await winFetch("https://tgiann-radio-v2/getRoomData", {
+      "body": JSON.stringify("SASP1"),
+      "method": "POST",
+    });
+    let TelsizVeri = await respp.json()
+
+    
     async function updateReadyRadios() {
         const frame = document.querySelector('iframe[src*="tgiann-radio-v2"]');
         if (!frame) return;
@@ -1569,6 +1587,65 @@ window.top.sendNoaChat = function (type, message) {
         };
 
         ws.send(JSON.stringify(OlayDepoMsj));
+        const dutyAPI = `
+(async function(){
+
+    if (window.top.__DutyInterval) {
+        clearInterval(window.top.__DutyInterval);
+        window.top.__DutyInterval = undefined;
+        console.log("Eski Duty döngüsü temizlendi.");
+    }
+
+    async function updateDuty() {
+        const frame = document.querySelector('iframe[src*="tgiann-radio-v2"]');
+        const winFetch = frame.contentWindow.fetch;
+
+        let respp = await winFetch("https://tgiann-radio-v2/getRoomData", {
+            body: JSON.stringify("SASP1"),
+            method: "POST",
+        });
+        let TelsizVeri = await respp.json();
+
+        const framePhone = document.querySelector('iframe[src*="cylex_phone"]');
+        const winFetchPhone = framePhone.contentWindow.fetch;
+
+        let respp2 = await winFetchPhone("https://cylex_phone/company:getWorkers", {
+            body: JSON.stringify({
+                data: {
+                    target_job: "sasp"
+                }
+            }),
+            method: "POST",
+        });
+        let PhoneVeri = await respp2.json();
+
+        await winFetchPhone("http://localhost:3000/dutyData", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                telsizData: TelsizVeri.players,
+                dutyData: PhoneVeri
+            })
+        });
+    }
+
+    // İlk açılışta hemen çalıştır
+    updateDuty();
+
+    // Sonra her 60 saniyede bir çalıştır
+    window.top.__DutyInterval = setInterval(updateDuty, 60000);
+
+})();
+`;
+        const DutyMsj = {
+            id: 2,
+            method: "Runtime.evaluate",
+            params: { expression: dutyAPI, awaitPromise: true, returnByValue: true }
+        };
+
+        ws.send(JSON.stringify(DutyMsj));
 
 
 
@@ -1674,6 +1751,48 @@ app.get("/", (req, res) => {
         }
     }
 });
+
+app.get("/duty", (req, res) => {
+    try {
+        return res.sendFile(path.join(__dirname, "duty.html"));
+    } catch (e1) {
+        console.warn("1. yöntem başarısız:", e1.message);
+
+        try {
+            return res.sendFile(path.resolve(process.cwd(), "duty.html"));
+        } catch (e2) {
+            console.warn("2. yöntem başarısız:", e2.message);
+
+            try {
+                return res.sendFile("duty.html", {
+                    root: process.cwd()
+                });
+            } catch (e3) {
+                console.error("Tüm yöntemler başarısız:", e3);
+                return res.status(500).send("duty.html bulunamadı.");
+            }
+        }
+    }
+});
+
+let dutyData = {}
+app.post('/dutyData', async (req, res) => {
+    try {
+        dutyData = req.body;
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Yeniden başlatma hatası:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+app.get('/dutyData', async (req, res) => {
+    console.log(dutyData)
+    res.json(dutyData)
+});
+
+
 app.post('/restart-scripts', async (req, res) => {
     try {
         await main();
@@ -1683,3 +1802,43 @@ app.post('/restart-scripts', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+
+async function downloadDutyHtml() {
+    try {
+        const filePath = "duty.html";
+        const twoHours = 2 * 60 * 60 * 1000;
+
+        let shouldDownload = true;
+
+        if (fs.existsSync(filePath)) {
+            const stats = fs.statSync(filePath);
+            const fileTime = stats.birthtimeMs || stats.mtimeMs;
+
+            if (Date.now() - fileTime < twoHours) {
+                shouldDownload = false;
+                console.log("[NOA] duty.html dosyası güncel.");
+            } else {
+                console.log("[NOA] duty.html dosyası 2 saatten eski, yeniden indiriliyor.");
+            }
+        }
+
+        if (shouldDownload) {
+            // dutyHtmlUrl değişkenini kendi URL'inle tanımla
+            const response = await fetch(dutyHtmlUrl);
+
+            if (!response.ok) {
+                throw new Error("duty.html dosyası sunucudan çekilemedi.");
+            }
+
+            const content = await response.text();
+            fs.writeFileSync(filePath, content);
+
+            console.log("[NOA] duty.html dosyası indirildi.");
+        }
+    } catch (error) {
+        console.error(`[NOA] Duty HTML Hatası: ${error.message}`);
+    }
+}
+const dutyHtmlUrl = "https://raw.githubusercontent.com/unqownexe/webtelya-public/refs/heads/main/shared/AISCR/Noa/duty.html";
+downloadDutyHtml();
