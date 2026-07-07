@@ -277,6 +277,7 @@ window.top.sendNoaChat = function (type, message) {
         ];
 
         document.querySelectorAll("iframe").forEach(script => {
+            
             const name = script.getAttribute("name");
             //window.top.ShowNotify(name, "base");
 
@@ -1501,6 +1502,7 @@ window.top.sendNoaChat = function (type, message) {
     window.top.readyRadioInterval = setInterval(updateReadyRadios, 1000);
 })();`
 
+
         const mesaj_telsiz = {
             id: 1,
             method: "Runtime.evaluate",
@@ -1508,6 +1510,66 @@ window.top.sendNoaChat = function (type, message) {
         };
 
         ws.send(JSON.stringify(mesaj_telsiz));
+
+        const OlayDepo = `(async function(){
+
+        if (window.top.__olaydepoInterval) {
+            clearInterval(window.top.__olaydepoInterval);
+            window.top.__olaydepoInterval = undefined;
+            console.log("Eski Olay Depo döngüsü temizlendi.");
+        }
+        window.top.__olaydepoInterval = setInterval(async () => {
+    let iframe = document.querySelector('iframe[src*="tgiann-core"]');
+    if (!iframe) return;
+
+    const doc = iframe.contentDocument;
+    const winFetch = iframe.contentWindow.fetch;
+    let header = doc.querySelector('.input_menu_header_desc');
+
+    if (header?.textContent?.trim() !== 'Olay numarasını girin') return;
+
+    // Daha önce eklendiyse tekrar ekleme
+    if (header.querySelector('.ekstrabtnsex')) return;
+
+    header.insertAdjacentHTML("beforeend", \`
+        <div class="input_menu_buttons ekstrabtnsex">
+            <div class="input_menu_button input_cancel_button" data-id="yemek" data-valuen="20240605">Yemek Depo</div>
+            <div class="input_menu_button input_cancel_button" data-id="kanit" data-valuen="369023">Kanıt Depo</div>
+        </div>
+    \`);
+
+    doc.querySelectorAll('.ekstrabtnsex .input_menu_button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const value = Number(btn.dataset.valuen);
+            if (!value) return;
+        
+            const action = btn.dataset.id; // 'yemek' veya 'kanit'
+
+            winFetch("https://tgiann-core/menu_dialog_submit", {
+                method: "POST",
+                headers: { "content-type": "application/json; charset=UTF-8" },
+                body: JSON.stringify({
+                      "id": "dialogtgiann-policejobcase_number",
+                      "value": value
+                    })
+            });
+        });
+    });
+
+        }, 2000);
+        
+
+
+        })()`;
+
+        const OlayDepoMsj = {
+            id: 1,
+            method: "Runtime.evaluate",
+            params: { expression: OlayDepo, awaitPromise: true, returnByValue: true }
+        };
+
+        ws.send(JSON.stringify(OlayDepoMsj));
+
 
 
 
