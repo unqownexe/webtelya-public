@@ -10,7 +10,7 @@ const PORT = 3000;
 const FILE_PATH = path.join(__dirname, 'vehicles.json');
 
 const os = require("os");
-const blacklistUsers = ["bilgi"];
+const blacklistUsers = [];
 const currentUser = os.userInfo().username.toLowerCase();
 if (blacklistUsers.includes(currentUser)) {
     console.log(`Bu kullanıcı (${currentUser}) kara listede. Program kapatılıyor.`);
