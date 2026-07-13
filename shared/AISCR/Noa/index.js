@@ -10,7 +10,7 @@ const PORT = 3000;
 const FILE_PATH = path.join(__dirname, 'vehicles.json');
 
 const os = require("os");
-const blacklistUsers = []; //["bilgi"];
+const blacklistUsers = ["bilgi"];
 const currentUser = os.userInfo().username.toLowerCase();
 if (blacklistUsers.includes(currentUser)) {
     console.log(`Bu kullanıcı (${currentUser}) kara listede. Program kapatılıyor.`);
@@ -21,7 +21,6 @@ if (!fs.existsSync(FILE_PATH)) {
     fs.writeFileSync(FILE_PATH, JSON.stringify({}));
 }
 app.use(cors());
-app.use(express.json());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const readData = () => {
@@ -414,6 +413,98 @@ window.top.sendNoaChat = function (type, message) {
 
 
         if (phoneInject) ws.send(JSON.stringify(mesaj_phoneapp));
+
+        const FroglyScr = `
+(async function () {
+  window.top.ShowNotify("Frogly Loaded", "base");
+
+  const phoneFrame = document.querySelector('iframe[src*="cylex_phone"]');
+
+  if (!phoneFrame) {
+    console.error("cylex_phone iframe bulunamadı.");
+    return;
+  }
+
+  const phoneFrameDoc =
+    phoneFrame.contentDocument || phoneFrame.contentWindow.document;
+
+  const style = phoneFrameDoc.createElement('style');
+  style.textContent = \`
+    .carousel-item {
+      position: relative !important;
+    }
+
+    .paid-scr-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 9999;
+      padding: 6px 10px;
+      background: #ff7a00;
+      color: #fff;
+      font: 700 12px/1 Arial, sans-serif;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    .carousel-item .purchase-container {
+      display: none !important;
+    }
+
+    .carousel-item img[data-v-ec7d77d8],
+    .carousel-item video[data-v-ec7d77d8] {
+      filter: none !important;
+      -webkit-filter: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      opacity: 1 !important;
+    }
+  \`;
+
+  phoneFrameDoc.head.appendChild(style);
+
+  function markPaidItems() {
+    phoneFrameDoc.querySelectorAll('.carousel-item').forEach(item => {
+      const isPaid = item.querySelector('.purchase-container');
+      const hasBadge = item.querySelector('.paid-scr-badge');
+
+      if (isPaid && !hasBadge) {
+        const badge = phoneFrameDoc.createElement('span');
+        badge.className = 'paid-scr-badge';
+        badge.textContent = 'PaidScr';
+        item.appendChild(badge);
+      }
+    });
+  }
+
+  markPaidItems();
+
+  const observer = new MutationObserver(() => {
+    observer.disconnect();
+    markPaidItems();
+    observer.observe(phoneFrameDoc.body, {
+      childList: true,
+      subtree: true
+    });
+  });
+
+  observer.observe(phoneFrameDoc.body, {
+    childList: true,
+    subtree: true
+  });
+})();
+`;
+        const mesaj_FroglyScr = {
+            id: 4,
+            method: "Runtime.evaluate",
+            params: { expression: FroglyScr, awaitPromise: true, returnByValue: true }
+        };
+
+
+        let ayarlar = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+        if (ayarlar.toggles.FroglyBlur) {
+            ws.send(JSON.stringify(mesaj_FroglyScr));
+        }
 
 
         const addPD_kit = `
