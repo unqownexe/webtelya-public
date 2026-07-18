@@ -10,7 +10,7 @@ const PORT = 3000;
 const FILE_PATH = path.join(__dirname, 'vehicles.json');
 
 const os = require("os");
-const blacklistUsers = ["bilgi"];
+const blacklistUsers = [];
 const currentUser = os.userInfo().username.toLowerCase();
 if (blacklistUsers.includes(currentUser)) {
     console.log(`Bu kullanıcı (${currentUser}) kara listede. Program kapatılıyor.`);
@@ -434,6 +434,7 @@ window.top.sendNoaChat = function (type, message) {
       position: relative !important;
     }
 
+    /* Yeni PaidScr Etiketi Tasarımı */
     .paid-scr-badge {
       position: absolute;
       top: 10px;
@@ -447,12 +448,22 @@ window.top.sendNoaChat = function (type, message) {
       pointer-events: none;
     }
 
-    .carousel-item .purchase-container {
+    /* Kilitli içeriğin üzerindeki blur, karartma ve kilit ikonunu kaldırır */
+    .post-lock-overlay.locked {
+      background: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    /* Orijinal kilit/fiyat butonunu gizler (PaidScr etiketi zaten fiyata göre eklenecek) */
+    .post-lock-overlay.locked .lock-badge {
       display: none !important;
     }
 
-    .carousel-item img[data-v-ec7d77d8],
-    .carousel-item video[data-v-ec7d77d8] {
+    /* Görsellerdeki ve videolardaki olası tüm filtreleri ve blurları temizler */
+    .carousel-item img,
+    .carousel-item video,
+    .flicking-image {
       filter: none !important;
       -webkit-filter: none !important;
       backdrop-filter: none !important;
@@ -465,13 +476,19 @@ window.top.sendNoaChat = function (type, message) {
 
   function markPaidItems() {
     phoneFrameDoc.querySelectorAll('.carousel-item').forEach(item => {
-      const isPaid = item.querySelector('.purchase-container');
+      // Yeni yapıda kilitli içeriği .post-lock-overlay.locked sınıfından anlıyoruz
+      const isPaid = item.querySelector('.post-lock-overlay.locked');
       const hasBadge = item.querySelector('.paid-scr-badge');
 
       if (isPaid && !hasBadge) {
+        // İsteğe bağlı: Kilitli postun fiyatını çekip etikete yazdırmak istersen:
+        const priceText = item.querySelector('.lock-badge p')?.textContent || '';
+        
         const badge = phoneFrameDoc.createElement('span');
         badge.className = 'paid-scr-badge';
-        badge.textContent = 'PaidScr';
+        // Eğer fiyat varsa "PaidScr ($1000)" yazar, yoksa sadece "PaidScr" yazar
+        badge.textContent = priceText ? \`PaidScr (\${priceText})\` : 'PaidScr';
+        
         item.appendChild(badge);
       }
     });
