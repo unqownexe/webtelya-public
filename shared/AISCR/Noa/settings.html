@@ -341,6 +341,7 @@
                     <span>Frogly Blur Bypass</span>
                     <div class="toggle-switch" data-setting="FroglyBlur" onclick="toggleSetting(this)"></div>
                 </div>
+
             </div>
 
             <div class="panel-column">
@@ -387,7 +388,21 @@
                         <button class="add-task-btn" onclick="addNewTask()">+</button>
                     </div>
 
-                    <div id="task-container"></div>
+                    <div id="task-container" style="max-height: 250px;"></div>
+                </div>
+
+                <div class="toggle-switchsex" style="margin-top: 15px;">
+                    <div class="toggle-row"
+                        style="margin-top:0; background:transparent; padding:0; border:none; margin-bottom:10px;">
+                        <span style="font-weight:700; font-size:14px; color:#00d2ff;">Araç Teleport</span>
+                        <button class="add-task-btn" onclick="loadSavedCars()">Yenile</button>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="car-search-input" placeholder="Araç Ara (İsim, Plaka...)" oninput="filterSavedCars()" style="width: 100%; background: rgba(10, 15, 26, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); color: #fff; padding: 10px 14px; border-radius: 12px; outline: none; font-size: 13px;">
+                    </div>
+                    <div id="saved-cars-container" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-grow: 1; padding-right: 8px;">
+                        <!-- Araç listesi buraya gelecek -->
+                    </div>
                 </div>
             </div>
 
@@ -492,6 +507,7 @@
                 });
             }
             renderTasks();
+            loadSavedCars();
         } catch (e) { console.error("Veri hatası:", e); }
     }
 
@@ -611,6 +627,74 @@
             btn.innerText = "GPS Sunucusuna Gönder";
             btn.style.background = "linear-gradient(135deg, #00d2ff, #00a2ff)";
         }, 1500);
+    }
+
+    window.allSavedCars = [];
+
+    async function loadSavedCars() {
+        try {
+            const res = await fetch('/api/saved_cars');
+            let cars = await res.json();
+            
+            try {
+                const vRes = await fetch('/api/vehicles');
+                if (vRes.ok) {
+                    const customVehicles = await vRes.json();
+                    cars = cars.map(c => {
+                        if (customVehicles[c.plate]) {
+                            const customName = typeof customVehicles[c.plate] === 'object' ? customVehicles[c.plate].name : customVehicles[c.plate];
+                            if (customName) c.name = customName;
+                        }
+                        return c;
+                    });
+                }
+            } catch(err) { console.error("Custom vehicles fetch error:", err); }
+
+            window.allSavedCars = cars;
+            renderSavedCars(cars);
+        } catch(e) { console.error(e); }
+    }
+
+    function renderSavedCars(carsToRender) {
+        const container = document.getElementById('saved-cars-container');
+        container.innerHTML = carsToRender.map((c, i) => `
+            <div class="task-item" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; flex-direction: column; overflow: hidden; margin-right: 8px;">
+                    <span style="font-weight: bold; font-size: 13px; color: #fff; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${c.name}</span>
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.5);">${c.plate} - ${c.brand}${c.garageKey ? ` - Garaj: ${c.garageKey}` : ''}</span>
+                </div>
+                ${c.garageKey ? `<button class="add-task-btn" style="padding: 6px 12px; font-size: 11px; background: rgba(54, 255, 159, 0.2); color: #36ff9f;" onclick="teleportCar('${c.plate}', ${c.slotIndex}, '${c.garageKey}')">Işınlan</button>` : ''}
+            </div>
+        `).join('');
+    }
+
+    function filterSavedCars() {
+        const query = document.getElementById('car-search-input').value.toLowerCase();
+        const filtered = window.allSavedCars.filter(c => 
+            c.name.toLowerCase().includes(query) || 
+            c.plate.toLowerCase().includes(query) || 
+            (c.brand && c.brand.toLowerCase().includes(query))
+        );
+        renderSavedCars(filtered);
+    }
+
+    async function teleportCar(plate, slotIndex, garageKey) {
+        try {
+            await fetch('/api/teleport_car', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plate, slotIndex, garageKey })
+            });
+            const notify = document.getElementById('restart-notify');
+            notify.innerText = plate + " Işınlanma İsteği Gönderildi!";
+            notify.style.background = "#10b981";
+            notify.style.display = 'block';
+            setTimeout(() => {
+                notify.style.display = 'none';
+                notify.innerText = "Değişiklikleri Senkronize Et (Yeniden Başlat)";
+                notify.style.background = "#ef4444";
+            }, 2000);
+        } catch(e) { console.error(e); }
     }
 
     initData();
