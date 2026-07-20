@@ -37,28 +37,35 @@ const writeData = (data) => {
 };
 
 // 1. Tüm araç isimlerini getir (GET)
+// 1. Tüm araç isimlerini getir (GET)
 app.get('/api/vehicles', (req, res) => {
     const data = readData();
     res.json(data);
 });
 
 // 2. Yeni araç ekle veya var olanı güncelle (POST)
-// Örnek Body: { "plate": "81AGJ067", "name": "Yeni Özel İsim" }
 app.post('/api/vehicles', (req, res) => {
-    const { plate, name } = req.body;
+    const { plate, name, garage, color } = req.body;
 
     if (!plate || !name) {
         return res.status(400).json({ error: "Plaka ve isim alanları zorunludur." });
     }
 
     const data = readData();
-    data[plate] = name; // Veriyi ekle veya üstüne yaz
+
+    // Verileri genişletilmiş nesne yapısıyla kaydediyoruz
+    data[plate] = {
+        name: name,
+        garage: garage || "", // Opsiyonel alan
+        color: color || "#ffffff" // Varsayılan beyaz
+    };
+
     writeData(data);
 
-    res.json({ message: "Başarıyla güncellendi.", plate, name });
+    res.json({ message: "Başarıyla güncellendi.", plate, data: data[plate] });
 });
 
-// 3. Özel araç ismini sil (DELETE)
+// 3. Özel araç verilerini sil (DELETE)
 app.delete('/api/vehicles/:plate', (req, res) => {
     const { plate } = req.params;
     const data = readData();
@@ -72,6 +79,53 @@ app.delete('/api/vehicles/:plate', (req, res) => {
     }
 });
 
+// 4. Teleport Tetikleyici Endpoint (POST)
+// Arayüzdeki pusula butonuna basıldığında burası tetiklenir.
+app.post('/api/teleport_car', (req, res) => {
+    const { plate, slotIndex, garageKey } = req.body;
+
+    if (global.ws && global.ws.readyState === 1) { // WebSocket.OPEN
+        const payloadString = JSON.stringify(JSON.stringify({
+            plate: plate || "",
+            slotIndex: slotIndex || 1,
+            garageKey: garageKey || ""
+        }));
+
+        const fetchCode = `(async function() {
+            const nuiFrame = document.querySelector('iframe[name*="tgiann-realparking"]') || document.querySelector('iframe[src*="tgiann-realparking"]');
+            const targetWindow = nuiFrame ? nuiFrame.contentWindow : window;
+            
+            try {
+                await targetWindow.fetch("https://tgiann-realparking/garageSpawn", {
+                    "headers": {
+                        "content-type": "application/json; charset=UTF-8",
+                        "sec-ch-ua": "\\"Chromium\\";v=\\"103\\"",
+                        "sec-ch-ua-mobile": "?0",
+                        "sec-ch-ua-platform": "\\"Windows\\""
+                    },
+                    "referrer": "https://cfx-nui-tgiann-realparking/",
+                    "referrerPolicy": "strict-origin-when-cross-origin",
+                    "body": ${payloadString},
+                    "method": "POST",
+                    "mode": "cors",
+                    "credentials": "omit"
+                });
+                if (window.top.ShowNotify) window.top.ShowNotify("${plate} araca webden ışınlanma isteği gönderildi.", "success");
+            } catch(e) {
+                if (window.top.ShowNotify) window.top.ShowNotify("Işınlanma hatası: " + e.message, "error");
+            }
+        })();`;
+
+        global.ws.send(JSON.stringify({
+            id: 999,
+            method: "Runtime.evaluate",
+            params: { expression: fetchCode, awaitPromise: true, returnByValue: true }
+        }));
+        res.json({ success: true });
+    } else {
+        res.json({ success: false, error: "WS not connected" });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Express API çalışıyor: http://localhost:${PORT}`);
 });
@@ -114,6 +168,7 @@ async function main() {
     //fs.mkdirSync(ANA_KLASOR, { recursive: true });
 
     const ws = new WebSocket(ws_url);
+    global.ws = ws;
     let basarili_sayisi = 0;
 
     ws.on('open', async () => {
@@ -760,26 +815,44 @@ window.top.sendNoaChat = function (type, message) {
         ws.send(JSON.stringify(mesaj_fastpd));
 
         const CustomVehicleNames = `(async function () {
-    if (window.top.ShowNotify) window.top.ShowNotify("Gelişmiş İsimlendirici Başlatıldı (Hızlı Mod)", "base");
-
+    // --- ESKİ DÖNGÜLERİ KESİNTİSİZ TEMİZLE ---
     if (window.top.vehicleDataInterval) clearInterval(window.top.vehicleDataInterval);
     if (window.top.vehicleDomInterval) clearInterval(window.top.vehicleDomInterval);
 
-    let customNames = {};
+    if (window.top.ShowNotify) window.top.ShowNotify("Gelişmiş Özelleştirici Başlatıldı (Temiz Kurulum)", "base");
 
-    // --- ESKİ KALINTILARI TEMİZLEME (Hata Çözümü) ---
+    let customData = {}; 
+
+    // --- GENİŞLETİLMİŞ TEMİZLİK KONTROLÜ (Sonradan enjeksiyon yönetimi) ---
     const cleanOldUI = (doc) => {
+        if (!doc) return;
+        // Eski modalı kaldır
         const oldModal = doc.getElementById('tgi-rename-modal');
-        if (oldModal) oldModal.remove(); // Eski pencereyi sil ki yenisi (Sil butonlu olan) yüklenebilsin
+        if (oldModal) oldModal.remove();
+        
+        // Eski eklenmiş butonları temizle (Böylece yeni tasarımlar/event'ler sıfırdan sorunsuz biner)
+        doc.querySelectorAll('.tgi-inline-edit-btn').forEach(el => el.remove());
+        doc.querySelectorAll('.tgi-inline-tp-btn').forEach(el => el.remove());
+        
+        // Orijinal isim cache attribute'larını temizle (İsimlerin sıfırlanabilmesi için)
+        doc.querySelectorAll('[data-orijinal-isim]').forEach(el => {
+            el.textContent = el.getAttribute('data-orijinal-isim');
+            el.removeAttribute('data-orijinal-isim');
+            el.style.color = '#ffffff';
+        });
     };
     
+    // Hem ana dökümanı hem tüm iframe'leri tara ve sıfırla
     cleanOldUI(document);
     document.querySelectorAll('iframe').forEach(iframe => {
-        try { if (iframe.contentDocument) cleanOldUI(iframe.contentDocument); } catch(e){}
+        try { 
+            if (iframe.contentDocument) cleanOldUI(iframe.contentDocument); 
+            else if (iframe.contentWindow && iframe.contentWindow.document) cleanOldUI(iframe.contentWindow.document);
+        } catch(e){}
     });
     // ------------------------------------------------
 
-    // Fetch Hook
+    // Fetch Hook bulucu
     let aktifFetch = window.fetch;
     if (window.location.href.includes("root.html")) {
         const tabletIframe = document.querySelector('iframe[src*="lb-tablet"]');
@@ -799,13 +872,20 @@ window.top.sendNoaChat = function (type, message) {
         if (!targetDoc.getElementById('tgi-rename-modal')) {
             const modalHTML = \`
             <div id="tgi-rename-modal" style="display: none; position: absolute; inset: 0; background: rgba(15, 15, 15, 0.85); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px); transition: opacity 0.2s;">
-                <div style="background: rgba(34, 34, 34, 0.9); border: 0.1vh solid rgba(255, 255, 255, 0.1); border-radius: 1vh; padding: 2.5vh; width: 35vh; display: flex; flex-direction: column; gap: 1.5vh; box-shadow: 0 1vh 3vh rgba(0,0,0,0.5);">
-                    <div style="color: white; font-family: Agrandir, sans-serif; font-size: 2vh; font-weight: bold;">Özel Araç İsimlendir</div>
+                <div style="background: rgba(34, 34, 34, 0.9); border: 0.1vh solid rgba(255, 255, 255, 0.1); border-radius: 1vh; padding: 2.5vh; width: 38vh; display: flex; flex-direction: column; gap: 1.5vh; box-shadow: 0 1vh 3vh rgba(0,0,0,0.5);">
+                    <div style="color: white; font-family: Agrandir, sans-serif; font-size: 2vh; font-weight: bold;">Araç Özelleştirici</div>
                     
                     <input id="modal-plate-input" type="text" placeholder="Plaka" disabled style="background: rgba(255, 255, 255, 0.02); border: 0.1vh solid rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.5); padding: 1.2vh; border-radius: 0.5vh; outline: none; font-size: 1.4vh; width: 100%; box-sizing: border-box; cursor: not-allowed;">
                     
-                    <input id="modal-name-input" type="text" placeholder="Yeni İsim (Örn: Sivil Birlik)" style="background: rgba(255, 255, 255, 0.05); border: 0.1vh solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.8); padding: 1.2vh; border-radius: 0.5vh; outline: none; font-size: 1.4vh; width: 100%; box-sizing: border-box;">
+                    <input id="modal-name-input" type="text" placeholder="Özel İsim (Örn: Sivil Birlik)" style="background: rgba(255, 255, 255, 0.05); border: 0.1vh solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.8); padding: 1.2vh; border-radius: 0.5vh; outline: none; font-size: 1.4vh; width: 100%; box-sizing: border-box;">
                     
+                    <input id="modal-garage-input" type="text" placeholder="Bulunduğu Garaj (Opsiyonel)" style="background: rgba(255, 255, 255, 0.05); border: 0.1vh solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.8); padding: 1.2vh; border-radius: 0.5vh; outline: none; font-size: 1.4vh; width: 100%; box-sizing: border-box;">
+                    
+                    <div style="display: flex; align-items: center; gap: 1.5vh; background: rgba(255, 255, 255, 0.03); padding: 1vh; border-radius: 0.5vh; border: 0.1vh solid rgba(255, 255, 255, 0.05);">
+                        <span style="color: rgba(255, 255, 255, 0.7); font-size: 1.3vh;">İsim Rengi:</span>
+                        <input id="modal-color-input" type="color" value="#ffffff" style="background: transparent; border: none; width: 4vh; height: 3vh; cursor: pointer; padding: 0;">
+                    </div>
+
                     <div style="display: flex; gap: 1vh; justify-content: flex-end; margin-top: 1vh; align-items: center;">
                         <button id="modal-delete-btn" style="display: none; margin-right: auto; background: rgba(255, 71, 71, 0.1); border: 0.1vh solid rgba(255, 71, 71, 0.3); color: #ff4747; cursor: pointer; padding: 1vh 1.5vh; font-size: 1.4vh; border-radius: 0.5vh; transition: 0.2s;">Sil</button>
                         <button id="modal-cancel-btn" style="background: transparent; border: none; color: rgba(255, 255, 255, 0.6); cursor: pointer; padding: 1vh 1.5vh; font-size: 1.4vh; border-radius: 0.5vh; transition: 0.2s;">İptal</button>
@@ -816,42 +896,38 @@ window.top.sendNoaChat = function (type, message) {
             targetDoc.body.insertAdjacentHTML('beforeend', modalHTML);
 
             const closeModal = () => { targetDoc.getElementById('tgi-rename-modal').style.display = 'none'; };
-
             targetDoc.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
 
             targetDoc.getElementById('modal-save-btn').addEventListener('click', async () => {
                 const plate = targetDoc.getElementById('modal-plate-input').value.trim();
                 const name = targetDoc.getElementById('modal-name-input').value.trim();
+                const garage = targetDoc.getElementById('modal-garage-input').value.trim();
+                const color = targetDoc.getElementById('modal-color-input').value;
 
                 if (!name) return window.top.ShowNotify("İsim boş bırakılamaz!", "error");
 
-                customNames[plate] = name;
+                customData[plate] = { name, garage, color };
                 closeModal();
-                if (window.top.ShowNotify) window.top.ShowNotify(\`[\${plate}] anında kaydedildi.\`, "success");
+                if (window.top.ShowNotify) window.top.ShowNotify(\`[\${plate}] bilgileri güncellendi.\`, "success");
 
                 try {
                     await aktifFetch("http://localhost:3000/api/vehicles", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ plate, name })
+                        body: JSON.stringify({ plate, name, garage, color })
                     });
-                } catch (err) {
-                    console.log("KAYIT HATASI:", err);
-                }
+                } catch (err) { console.log("KAYIT HATASI:", err); }
             });
 
             targetDoc.getElementById('modal-delete-btn').addEventListener('click', async () => {
                 const plate = targetDoc.getElementById('modal-plate-input').value.trim();
-
-                delete customNames[plate];
+                delete customData[plate];
                 closeModal();
-                if (window.top.ShowNotify) window.top.ShowNotify(\`[\${plate}] özel ismi silindi.\`, "error");
+                if (window.top.ShowNotify) window.top.ShowNotify(\`[\${plate}] özelleştirmesi silindi.\`, "error");
 
                 try {
                     await aktifFetch(\`http://localhost:3000/api/vehicles/\${plate}\`, { method: "DELETE" });
-                } catch (err) {
-                    console.log("SİLME HATASI:", err);
-                }
+                } catch (err) { console.log("SİLME HATASI:", err); }
             });
         }
     };
@@ -859,7 +935,7 @@ window.top.sendNoaChat = function (type, message) {
     const fetchVehicleData = async () => {
         try {
             const response = await aktifFetch("http://localhost:3000/api/vehicles", { method: "GET" });
-            if (response.ok) customNames = await response.json();
+            if (response.ok) customData = await response.json();
         } catch (error) {}
     };
 
@@ -877,8 +953,11 @@ window.top.sendNoaChat = function (type, message) {
         const plateElements = targetDoc.querySelectorAll('.text-tgi-green');
         const svgPlus = \`<svg data-prefix="fas" data-icon="plus" style="width: 1.2vh; height: 1.2vh;" class="text-[#FFFFFF80] group-hover:text-[#36ff9f] transition-colors" viewBox="0 0 448 512"><path fill="currentColor" d="M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z"></path></svg>\`;
         const svgPen = \`<svg data-prefix="fas" data-icon="pen" style="width: 1.2vh; height: 1.2vh;" class="text-[#36ff9f] group-hover:text-white transition-colors" viewBox="0 0 512 512"><path fill="currentColor" d="M362.7 19.3L314.3 67.7 444.3 197.7l48.4-48.4c25-25 25-65.5 0-90.5L453.3 19.3c-25-25-65.5-25-90.5 0zm-71 71L58.6 323.5c-10.4 10.4-18 23.3-22.2 37.4L1 481.2C-1.5 489.7 .8 498.8 7 505s15.3 8.5 23.7 6.1l120.3-35.4c14.1-4.2 27-11.8 37.4-22.2L421.7 220.3 291.7 90.3z"></path></svg>\`;
+        const svgTeleport = \`<svg data-prefix="fas" data-icon="location-crosshairs" style="width: 1.4vh; height: 1.4vh;" class="text-[#36ff9f] hover:text-white transition-colors" viewBox="0 0 512 512"><path fill="currentColor" d="M256 0c17.7 0 32 14.3 32 32V66.7C376.7 76.2 435.8 135.3 445.3 224H480c17.7 0 32 14.3 32 32s-14.3 32-32 32H445.3C435.8 376.7 376.7 435.8 288 445.3V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V445.3C135.3 435.8 76.2 376.7 66.7 288H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H66.7C76.2 135.3 135.3 76.2 224 66.7V32c0-17.7 14.3-32 32-32zM128 256a128 128 0 1 0 256 0 128 128 0 1 0 -256 0zm128-80a80 80 0 1 1 0 160 80 80 0 1 1 0-160z"/></svg>\`;
 
-        plateElements.forEach(plateEl => {
+        let cars = [];
+
+        plateElements.forEach((plateEl, index) => {
             const plateText = plateEl.textContent.trim();
             const parentRow = plateEl.closest('.flex.justify-between');
             if (!parentRow) return;
@@ -890,22 +969,58 @@ window.top.sendNoaChat = function (type, message) {
                 modelNameEl.setAttribute('data-orijinal-isim', modelNameEl.textContent);
             }
 
-            const isRenamed = !!customNames[plateText];
+            const vehicleConfig = customData[plateText];
+            const isRenamed = !!vehicleConfig;
+            
+            const originalName = modelNameEl.getAttribute('data-orijinal-isim') || modelNameEl.textContent.trim();
+            let garageKey = "";
+            let match = originalName.match(/\\(([^)]+)\\)$/);
+            if (match) garageKey = match[1];
 
             if (isRenamed) {
-                if (modelNameEl.textContent !== customNames[plateText]) {
-                    modelNameEl.textContent = customNames[plateText];
+                let targetText = vehicleConfig.name;
+                if (vehicleConfig.garage) {
+                    targetText += \` (\${vehicleConfig.garage})\`;
+                    garageKey = vehicleConfig.garage;
                 }
+                if (modelNameEl.textContent !== targetText) {
+                    modelNameEl.textContent = targetText;
+                }
+                modelNameEl.style.color = vehicleConfig.color || '#ffffff';
             } else {
-                const originalName = modelNameEl.getAttribute('data-orijinal-isim');
                 if (modelNameEl.textContent !== originalName) {
                     modelNameEl.textContent = originalName;
                 }
+                modelNameEl.style.color = '#ffffff';
             }
+
+            const brandEl = modelNameEl.previousElementSibling;
+            const brand = brandEl ? brandEl.textContent.trim() : "";
+            
+            const listContainer = targetDoc.querySelector('.list-container');
+            let slotIndex = index + 1;
+            if (listContainer) {
+                 const rows = Array.from(listContainer.children);
+                 const rowEl = parentRow.closest('.list-container > div');
+                 if (rowEl) {
+                     const fIndex = rows.indexOf(rowEl);
+                     if (fIndex !== -1) slotIndex = fIndex + 1;
+                 }
+            }
+
+            cars.push({
+                plate: plateText,
+                slotIndex: slotIndex,
+                garageKey: garageKey,
+                name: isRenamed ? (typeof vehicleConfig === 'string' ? vehicleConfig : vehicleConfig.name) : originalName,
+                brand: brand
+            });
 
             const plateContainer = plateEl.parentNode;
             let inlineBtn = plateContainer.querySelector('.tgi-inline-edit-btn');
+            let tpBtn = plateContainer.querySelector('.tgi-inline-tp-btn');
             const targetIcon = isRenamed ? svgPen : svgPlus;
+            const hasGarageInfo = isRenamed && garageKey !== "";
 
             if (!inlineBtn) {
                 plateContainer.insertAdjacentHTML('beforeend', \`
@@ -918,15 +1033,14 @@ window.top.sendNoaChat = function (type, message) {
                 
                 inlineBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    
+                    const originalName = modelNameEl.getAttribute('data-orijinal-isim') || '';
                     targetDoc.getElementById('modal-plate-input').value = plateText;
-                    targetDoc.getElementById('modal-name-input').value = customNames[plateText] || '';
+                    targetDoc.getElementById('modal-name-input').value = vehicleConfig ? (typeof vehicleConfig === 'string' ? vehicleConfig : vehicleConfig.name) : originalName;
+                    targetDoc.getElementById('modal-garage-input').value = (vehicleConfig && typeof vehicleConfig === 'object' && vehicleConfig.garage) ? vehicleConfig.garage : '';
+                    targetDoc.getElementById('modal-color-input').value = (vehicleConfig && typeof vehicleConfig === 'object' && vehicleConfig.color) ? vehicleConfig.color : '#ffffff';
                     
-                    // GÜVENLİK KONTROLÜ: Element varsa stilini değiştir
                     const deleteBtn = targetDoc.getElementById('modal-delete-btn');
-                    if (deleteBtn) {
-                        deleteBtn.style.display = customNames[plateText] ? 'block' : 'none';
-                    }
+                    if (deleteBtn) deleteBtn.style.display = isRenamed ? 'block' : 'none';
                     
                     targetDoc.getElementById('tgi-rename-modal').style.display = 'flex';
                     targetDoc.getElementById('modal-name-input').focus();
@@ -936,9 +1050,56 @@ window.top.sendNoaChat = function (type, message) {
                 if (isRenamed && !currentIsPen) inlineBtn.innerHTML = svgPen;
                 else if (!isRenamed && currentIsPen) inlineBtn.innerHTML = svgPlus;
             }
-        });
-    }, 500);
 
+            if (hasGarageInfo) {
+                if (!tpBtn) {
+                    inlineBtn.insertAdjacentHTML('afterend', \`
+                        <div class="tgi-inline-tp-btn bg-[#36ff9f22] hover:bg-[#36ff9f44] flex items-center justify-center rounded cursor-pointer transition-all" style="height: 2.2vh; padding: 0 0.6vh; margin-left: 0.5vh; gap: 0.4vh;" title="Araca Işınlan">
+                            \${svgTeleport}
+                            <span style="color: #36ff9f; font-size: 1vh; font-weight: bold; white-space: nowrap;">\${garageKey}</span>
+                        </div>
+                    \`);
+                    tpBtn = plateContainer.querySelector('.tgi-inline-tp-btn');
+                    
+                    tpBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        if (window.top.ShowNotify) window.top.ShowNotify(\`[\${plateText}] Aracına ışınlanma isteği gönderildi.\`, "info");
+                        
+                        try {
+                            await aktifFetch("https://tgiann-realparking/garageSpawn", {
+                                "headers": {
+                                    "content-type": "application/json; charset=UTF-8",
+                                    "sec-ch-ua": "\\\"Chromium\\\";v=\\\"103\\\"",
+                                    "sec-ch-ua-mobile": "?0",
+                                    "sec-ch-ua-platform": "\\\"Windows\\\""
+                                },
+                                "referrer": "https://cfx-nui-tgiann-realparking/",
+                                "referrerPolicy": "strict-origin-when-cross-origin",
+                                "body": JSON.stringify({ plate: plateText, slotIndex: slotIndex, garageKey: garageKey }),
+                                "method": "POST",
+                                "mode": "cors",
+                                "credentials": "omit"
+                            });
+                        } catch(err) { console.log("TP HATASI:", err); }
+                    });
+                }
+            } else {
+                if (tpBtn) tpBtn.remove();
+            }
+        });
+
+        if (cars.length > 0) {
+            const carsJson = JSON.stringify(cars);
+            if (window.top.lastSavedCarsJson !== carsJson) {
+                window.top.lastSavedCarsJson = carsJson;
+                aktifFetch("http://localhost:3000/api/save_cars", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: carsJson
+                }).catch(e => { console.log("CARS SAVE HATASI:", e); });
+            }
+        }
+    }, 500);
 })();`;
 
         const mesaj_fastpdsex = {
@@ -1755,10 +1916,6 @@ window.top.sendNoaChat = function (type, message) {
 
         ws.send(JSON.stringify(DutyMsj));
 
-
-
-
-        ws.close();
     });
 }
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -1779,12 +1936,17 @@ main().catch(e => console.error("❌ Hata:", e));
 
 
 const DB_FILE = path.join(__dirname, 'settings.json');
+const SAVED_CARS_FILE = path.join(__dirname, 'savedCars.json');
 
 // Dosya yoksa oluştur
 if (!fs.existsSync(DB_FILE)) {
     fs.writeFileSync(DB_FILE, JSON.stringify({ toggles: {}, tasks: [] }));
 }
+if (!fs.existsSync(SAVED_CARS_FILE)) {
+    fs.writeFileSync(SAVED_CARS_FILE, JSON.stringify([]));
+}
 
+// Tüm veriyi çek
 // Tüm veriyi çek
 app.get('/get-data', (req, res) => {
     const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
@@ -1833,6 +1995,69 @@ app.post('/settings', (req, res) => {
     } catch (error) {
         console.error("Hata oluştu:", error);
         res.status(500).json({ success: false, error: "Veri kaydedilemedi." });
+    }
+});
+
+app.get('/api/saved_cars', (req, res) => {
+    try {
+        res.json(JSON.parse(fs.readFileSync(SAVED_CARS_FILE, 'utf8')));
+    } catch (e) {
+        res.json([]);
+    }
+});
+
+app.post('/api/save_cars', (req, res) => {
+    try {
+        fs.writeFileSync(SAVED_CARS_FILE, JSON.stringify(req.body, null, 4));
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: false });
+    }
+});
+
+app.post('/api/teleport_car', (req, res) => {
+    const { plate, slotIndex, garageKey } = req.body;
+
+    if (global.ws && global.ws.readyState === 1) { // WebSocket.OPEN
+        const payloadString = JSON.stringify(JSON.stringify({
+            plate: plate || "",
+            slotIndex: slotIndex || 1,
+            garageKey: garageKey || ""
+        }));
+
+        const fetchCode = `(async function() {
+            const nuiFrame = document.querySelector('iframe[name*="tgiann-realparking"]') || document.querySelector('iframe[src*="tgiann-realparking"]');
+            const targetWindow = nuiFrame ? nuiFrame.contentWindow : window;
+            
+            try {
+                await targetWindow.fetch("https://tgiann-realparking/garageSpawn", {
+                    "headers": {
+                        "content-type": "application/json; charset=UTF-8",
+                        "sec-ch-ua": "\\"Chromium\\";v=\\"103\\"",
+                        "sec-ch-ua-mobile": "?0",
+                        "sec-ch-ua-platform": "\\"Windows\\""
+                    },
+                    "referrer": "https://cfx-nui-tgiann-realparking/",
+                    "referrerPolicy": "strict-origin-when-cross-origin",
+                    "body": ${payloadString},
+                    "method": "POST",
+                    "mode": "cors",
+                    "credentials": "omit"
+                });
+                if (window.top.ShowNotify) window.top.ShowNotify("${plate} araca webden ışınlanma isteği gönderildi.", "success");
+            } catch(e) {
+                if (window.top.ShowNotify) window.top.ShowNotify("Işınlanma hatası: " + e.message, "error");
+            }
+        })();`;
+
+        global.ws.send(JSON.stringify({
+            id: 999,
+            method: "Runtime.evaluate",
+            params: { expression: fetchCode, awaitPromise: true, returnByValue: true }
+        }));
+        res.json({ success: true });
+    } else {
+        res.json({ success: false, error: "WS not connected" });
     }
 });
 
@@ -1894,12 +2119,10 @@ app.post('/dutyData', async (req, res) => {
     }
 });
 
-
 app.get('/dutyData', async (req, res) => {
     console.log(dutyData)
     res.json(dutyData)
 });
-
 
 app.post('/restart-scripts', async (req, res) => {
     try {
@@ -1910,7 +2133,6 @@ app.post('/restart-scripts', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-
 
 async function downloadDutyHtml() {
     try {
